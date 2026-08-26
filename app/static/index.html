@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Binary - TradingView Terminal & High-Precision Signal Engine</title>
+    <link rel="stylesheet" href="/static/css/styles.css?v=3.0">
+    <!-- Official TradingView Advanced Real-Time Charting Library -->
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-icon">⚡</span>
+            <span class="brand-title">QUANTUM BINARY</span>
+            <span class="brand-badge">TRADINGVIEW PRO</span>
+        </div>
+
+        <!-- Center Controls -->
+        <div class="header-controls">
+            <!-- Asset Selection (Grouped by Asset Class - NO FOREX) -->
+            <div class="control-group">
+                <span class="control-label">Asset</span>
+                <select id="symbol-select" class="custom-select">
+                    <!-- Populated dynamically from ASSET_CATALOG -->
+                </select>
+            </div>
+
+            <!-- Timeframe Pills -->
+            <div class="control-group">
+                <span class="control-label">TF</span>
+                <div class="btn-pill-group">
+                    <button class="btn-pill btn-timeframe active" data-tf="1m">1m</button>
+                    <button class="btn-pill btn-timeframe" data-tf="5m">5m</button>
+                    <button class="btn-pill btn-timeframe" data-tf="15m">15m</button>
+                    <button class="btn-pill btn-timeframe" data-tf="30m">30m</button>
+                    <button class="btn-pill btn-timeframe" data-tf="1h">1h</button>
+                    <button class="btn-pill btn-timeframe" data-tf="4h">4h</button>
+                    <button class="btn-pill btn-timeframe" data-tf="1d">1d</button>
+                </div>
+            </div>
+
+            <!-- Suggested Trade Time (Dynamic AI Optimal) -->
+            <div class="control-group">
+                <span class="control-label">Suggested Trade Time</span>
+                <div id="suggested-trade-time-badge" class="suggested-trade-badge" title="AI Confluence Engine automatically determines optimal trade duration">
+                    <span class="badge-icon">⚡</span>
+                    <span id="suggested-time-val" class="badge-text">5 Min</span>
+                    <span class="badge-sub">Auto-Optimal</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Header Actions -->
+        <div class="header-actions">
+            <div class="status-badge">
+                <div class="status-dot"></div>
+                <span id="live-feed-status-text">TradingView Live</span>
+            </div>
+
+            <button id="btn-open-optimize" class="btn-primary" style="background: linear-gradient(135deg, #7c4dff, #4a148c);">
+                <span>🧠</span> AI Optimize
+            </button>
+            <button id="btn-open-backtest" class="btn-secondary">
+                <span>📊</span> Backtest
+            </button>
+            <button id="btn-open-settings" class="btn-secondary">
+                <span>⚙</span> Settings
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="main-container">
+        <!-- Left Panel: Official TradingView Real-Time Chart & Trade Journal -->
+        <section class="left-panel">
+            <div class="chart-card">
+                <!-- Chart Toolbar -->
+                <div class="chart-toolbar">
+                    <div class="chart-title-area">
+                        <span id="current-pair-display" class="chart-pair">BTCUSDT</span>
+                        <span id="current-provider-tag" class="provider-tag binance">TradingView</span>
+                        <span id="current-price-display" class="chart-price">--.--</span>
+                    </div>
+                </div>
+
+                <!-- Main TradingView Chart Container -->
+                <div id="main-chart-wrapper" style="height: 520px; width: 100%; border-radius: 8px; overflow: hidden; background: #0e1320;"></div>
+            </div>
+
+            <!-- Live Multi-Chart Signals Stream (Scanner) -->
+            <div class="signals-stream-card">
+                <div class="stream-header">
+                    <div class="stream-title">
+                        <span class="live-pulse-dot"></span>
+                        <span>Live Signals Stream (Multi-Chart Scanner)</span>
+                        <span id="stream-active-count" class="badge-tag" style="background: rgba(0, 230, 118, 0.15); color: var(--call-color);">Scanning Live...</span>
+                    </div>
+
+                    <!-- Market Filter Chips -->
+                    <div class="stream-filter-pills">
+                        <button class="btn-stream-filter active" data-filter="all">All</button>
+                        <button class="btn-stream-filter" data-filter="Forex">💱 Forex</button>
+                        <button class="btn-stream-filter" data-filter="Crypto">🔥 Crypto</button>
+                        <button class="btn-stream-filter" data-filter="Commodities">🥇 Commodities</button>
+                        <button class="btn-stream-filter" data-filter="Indices">📈 Indices</button>
+                        <button class="btn-stream-filter" data-filter="high_conf" style="border-color: #7c4dff; color: #b388ff;">⚡ High Conf (≥75%)</button>
+                    </div>
+                </div>
+
+                <!-- Signals Stream Scrollable Grid -->
+                <div id="signals-stream-grid" class="signals-stream-grid">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- Bottom Trade Journal & Log -->
+            <div class="journal-card">
+                <div class="journal-header">
+                    <div class="journal-title">
+                        <span>Trade Journal & History</span>
+                        <span id="win-rate-pill" class="badge-winrate">Win Rate: --% (0/0)</span>
+                    </div>
+                    <div class="journal-stats">
+                        <span class="stat-item">Net PnL: <strong id="net-pnl-display" style="color: var(--call-color);">$0.00</strong></span>
+                        <button id="btn-clear-trades" class="btn-ghost" title="Clear all trades">Clear Log</button>
+                    </div>
+                </div>
+
+                <div class="trade-table-wrap">
+                    <table class="trade-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Asset</th>
+                                <th>TF</th>
+                                <th>Signal</th>
+                                <th>Trade Time</th>
+                                <th>Entry</th>
+                                <th>Exit</th>
+                                <th>Outcome</th>
+                                <th>PnL ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-history-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Confluence Signal Engine & Trade Deck -->
+        <aside class="right-panel">
+            <!-- Quantum Confluence Signal Card -->
+            <div class="signal-card">
+                <div class="card-header-compact">
+                    <span class="card-title">Quantum Confluence Signal</span>
+                    <span id="signal-model-badge" class="badge-tag">V3 AI CONFLUENCE</span>
+                </div>
+
+                <!-- Big Call/Put Signal Banner -->
+                <div id="signal-state-banner" class="signal-banner neutral">
+                    <div class="signal-direction">
+                        <span id="signal-direction-icon" class="sig-arrow">◆</span>
+                        <span id="signal-direction-text" class="sig-name">EVALUATING</span>
+                    </div>
+                    <div class="signal-confidence-badge">
+                        <div id="signal-confidence-val" class="conf-val">--%</div>
+                        <div class="conf-label">Confidence</div>
+                    </div>
+                </div>
+
+                <!-- Signal Metrics -->
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="metric-box-label">Entry Price</span>
+                        <span id="signal-entry-price" class="metric-box-value">--.--</span>
+                    </div>
+                    <div class="metric-box">
+                        <span class="metric-box-label">Trade Time</span>
+                        <span id="signal-expiry-time" class="metric-box-value">5m</span>
+                    </div>
+                </div>
+
+                <!-- Indicator Factors Checklist -->
+                <div class="reasons-list">
+                    <div class="reasons-title">Confluence Indicators</div>
+                    <div id="signal-reasons-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trade Execution Deck & Active Countdown Widget -->
+            <div class="trade-deck-card">
+                <div class="deck-title">
+                    <span>Trade Execution</span>
+                    <span id="payout-display-tag" style="font-size: 10px; color: var(--call-color);">Payout: 85%</span>
+                </div>
+
+                <div class="deck-inputs">
+                    <div class="input-wrap">
+                        <label>Stake ($)</label>
+                        <input type="number" id="trade-stake-input" class="custom-input" value="10" min="1" step="1">
+                    </div>
+                    <div class="input-wrap">
+                        <label>Custom TradingView Symbol</label>
+                        <div style="display: flex; gap: 4px;">
+                            <input type="text" id="custom-symbol-input" class="custom-input" placeholder="e.g. BINANCE:SOLUSDT or AAPL" style="flex: 1;">
+                            <button id="custom-symbol-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 11px;">Set</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Big Action Buttons -->
+                <div class="action-btn-row">
+                    <button id="btn-execute-call" class="btn-call">
+                        <span>▲ CALL / HIGHER</span>
+                        <span class="btn-subtext">HIGHER @ CLOSE</span>
+                    </button>
+                    <button id="btn-execute-put" class="btn-put">
+                        <span>▼ PUT / LOWER</span>
+                        <span class="btn-subtext">LOWER @ CLOSE</span>
+                    </button>
+                </div>
+
+                <!-- Active Trade Live Countdown Box -->
+                <div id="active-trade-box" class="active-trade-box" style="display: none;">
+                    <div class="active-trade-header">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="active-signal-badge" class="badge-sig call">CALL</span>
+                            <span style="font-size: 12px; font-weight: 600;">@ <span id="active-entry-price">--</span></span>
+                        </div>
+                        <div id="countdown-timer-text" class="countdown-display">00:00</div>
+                    </div>
+                    <div class="countdown-bar-wrap">
+                        <div id="countdown-progress-bar" class="countdown-bar"></div>
+                    </div>
+                    <div id="active-trade-status" style="font-size: 11px; text-align: center;">
+                        <span>Evaluating live difference...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Point in time inspection info -->
+            <div class="inspector-box">
+                <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">
+                    💡 High-Probability Strategy Rules
+                </div>
+                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+                    V3 Confluence Engine confirms: 1) Stochastic RSI Overbought/Oversold, 2) Bollinger Band Reversion, 3) MACD Direction, 4) EMA-50 Trend Alignment, 5) Rejection Wick Absorption.
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title">⚙ Strategy Indicator Settings</h3>
+                <button id="close-settings" class="modal-close">&times;</button>
+            </div>
+            <form id="settings-form">
+                <div class="modal-body">
+                    <div class="settings-grid">
+                        <div class="settings-section-title">RSI (Relative Strength Index)</div>
+                        <div class="input-wrap">
+                            <label>Period</label>
+                            <input type="number" id="setting-rsiPeriod" class="custom-input" min="2" max="50" value="9">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Oversold Level</label>
+                            <input type="number" id="setting-rsiOversold" class="custom-input" min="10" max="45" value="28">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Overbought Level</label>
+                            <input type="number" id="setting-rsiOverbought" class="custom-input" min="55" max="90" value="72">
+                        </div>
+
+                        <div class="settings-section-title">MACD Parameters</div>
+                        <div class="input-wrap">
+                            <label>Fast EMA</label>
+                            <input type="number" id="setting-macdFast" class="custom-input" min="2" max="50" value="12">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Slow EMA</label>
+                            <input type="number" id="setting-macdSlow" class="custom-input" min="5" max="100" value="26">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Signal Period</label>
+                            <input type="number" id="setting-macdSignal" class="custom-input" min="1" max="30" value="9">
+                        </div>
+
+                        <div class="settings-section-title">Bollinger Bands & Moving Averages</div>
+                        <div class="input-wrap">
+                            <label>Bollinger Period</label>
+                            <input type="number" id="setting-bbPeriod" class="custom-input" min="5" max="100" value="20">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Bollinger StdDev</label>
+                            <input type="number" id="setting-bbStd" class="custom-input" min="1.0" max="4.0" step="0.1" value="2.0">
+                        </div>
+                        <div class="input-wrap">
+                            <label>SMA Period</label>
+                            <input type="number" id="setting-smaPeriod" class="custom-input" min="2" max="200" value="20">
+                        </div>
+                        <div class="input-wrap">
+                            <label>EMA Period</label>
+                            <input type="number" id="setting-emaPeriod" class="custom-input" min="2" max="200" value="50">
+                        </div>
+
+                        <div class="settings-section-title">Trading Simulation Parameters</div>
+                        <div class="input-wrap">
+                            <label>Default Stake ($)</label>
+                            <input type="number" id="setting-stake" class="custom-input" min="1" step="1" value="10">
+                        </div>
+                        <div class="input-wrap">
+                            <label>Payout Rate (0.85 = 85%)</label>
+                            <input type="number" id="setting-payoutRate" class="custom-input" min="0.1" max="1.0" step="0.01" value="0.85">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn-primary">Save & Apply Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Backtest Modal -->
+    <div id="modal-backtest" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h3 class="modal-title">📊 Strategy Backtester</h3>
+                <button id="close-backtest" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Backtest Controls -->
+                <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+                    <div class="input-wrap">
+                        <label>Candles to Test</label>
+                        <select id="bt-candle-limit" class="custom-select">
+                            <option value="200">200 Candles</option>
+                            <option value="500" selected>500 Candles</option>
+                            <option value="1000">1000 Candles</option>
+                        </select>
+                    </div>
+                    <div class="input-wrap">
+                        <label>Trade Time Selection</label>
+                        <select id="bt-expiry-select" class="custom-select">
+                            <option value="30s">30 Sec</option>
+                            <option value="1min">1 Min</option>
+                            <option value="2min">2 Min</option>
+                            <option value="3min">3 Min</option>
+                            <option value="5min" selected>5 Min</option>
+                            <option value="15min">15 Min</option>
+                            <option value="30min">30 Min</option>
+                            <option value="1hr">1 Hour</option>
+                        </select>
+                    </div>
+                    <button id="btn-run-backtest" class="btn-primary" style="height: 38px;">
+                        Run Backtest
+                    </button>
+                </div>
+
+                <!-- Backtest Metrics Overview -->
+                <div class="backtest-metrics-grid">
+                    <div class="bt-stat-card">
+                        <div id="bt-res-winrate" class="bt-stat-val" style="color: var(--call-color);">--%</div>
+                        <div class="bt-stat-label">Win Rate</div>
+                    </div>
+                    <div class="bt-stat-card">
+                        <div id="bt-res-trades" class="bt-stat-val">0</div>
+                        <div class="bt-stat-label">Total Signals</div>
+                    </div>
+                    <div class="bt-stat-card">
+                        <div id="bt-res-profit" class="bt-stat-val" style="color: var(--call-color);">$0.00</div>
+                        <div class="bt-stat-label">Net Profit ($10 stake)</div>
+                    </div>
+                    <div class="bt-stat-card">
+                        <div id="bt-res-pf" class="bt-stat-val">--</div>
+                        <div class="bt-stat-label">Profit Factor</div>
+                    </div>
+                </div>
+
+                <!-- Equity Curve Graph Canvas -->
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">
+                        Cumulative PnL Equity Curve ($)
+                    </div>
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; height: 160px;">
+                        <canvas id="equity-curve-canvas" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                </div>
+
+                <!-- Backtest Trades Table -->
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">
+                        Simulated Trades Log (Top 50)
+                    </div>
+                    <div class="trade-table-wrap" style="max-height: 180px;">
+                        <table class="trade-table">
+                            <thead>
+                                <tr>
+                                    <th>Entry Time</th>
+                                    <th>Signal</th>
+                                    <th>Entry Price</th>
+                                    <th>Exit Price</th>
+                                    <th>Outcome</th>
+                                    <th>PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bt-trades-tbody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Strategy Optimizer Modal -->
+    <div id="modal-optimize" class="modal-overlay">
+        <div class="modal-card modal-large">
+            <div class="modal-header">
+                <h3 class="modal-title">🧠 AI Strategy Optimizer & Auto-Tuner</h3>
+                <button id="close-optimize" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background: rgba(124, 77, 255, 0.1); border: 1px solid #7c4dff; border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-primary);">
+                    🤖 <strong>AI Parameter Optimization:</strong> Scans historical market data, evaluates thousands of indicator permutations, and trains optimal RSI, MACD, Bollinger Bands, and Confidence settings to maximize your Win Rate %.
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: flex-end;">
+                    <button id="btn-run-optimize" class="btn-primary" style="background: linear-gradient(135deg, #7c4dff, #4a148c); height: 38px; padding: 0 20px;">
+                        ⚡ Start Auto-Training
+                    </button>
+                    <span id="optimize-status-text" style="font-size: 12px; color: var(--text-secondary);">Ready to train across live market data</span>
+                </div>
+
+                <!-- Comparison Cards -->
+                <div class="backtest-metrics-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="bt-stat-card">
+                        <div id="opt-baseline-winrate" class="bt-stat-val" style="color: var(--text-secondary);">--%</div>
+                        <div class="bt-stat-label">Baseline Win Rate</div>
+                    </div>
+                    <div class="bt-stat-card" style="border-color: #7c4dff;">
+                        <div id="opt-optimized-winrate" class="bt-stat-val" style="color: var(--call-color);">--%</div>
+                        <div class="bt-stat-label">AI-Trained Win Rate</div>
+                    </div>
+                    <div class="bt-stat-card">
+                        <div id="opt-winrate-boost" class="bt-stat-val" style="color: var(--accent-cyan);">+0.0%</div>
+                        <div class="bt-stat-label">Win Rate Boost</div>
+                    </div>
+                </div>
+
+                <!-- Parameters Table -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px;">
+                    <div style="font-size: 12px; font-weight: 700; color: var(--accent-blue); text-transform: uppercase; margin-bottom: 8px;">
+                        Optimal Discovered Indicator Parameters
+                    </div>
+                    <div id="opt-params-display" style="font-family: monospace; font-size: 13px; color: var(--text-primary); line-height: 1.8;">
+                        Click "Start Auto-Training" to compute the highest winning parameter setup for the active asset.
+                    </div>
+                </div>
+
+                <!-- Optimized Equity Curve -->
+                <div>
+                    <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">
+                        Trained Strategy Simulated PnL Curve ($)
+                    </div>
+                    <div style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; height: 140px;">
+                        <canvas id="opt-equity-canvas" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-apply-optimal-params" class="btn-primary" style="background: linear-gradient(135deg, #00c853, #007e33); display: none;">
+                    ✨ Apply Optimal Parameters to Live Terminal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Application JavaScript Bundles -->
+    <script src="/static/js/chart.js?v=3.0"></script>
+    <script src="/static/js/app.js?v=3.0"></script>
+</body>
+</html>
