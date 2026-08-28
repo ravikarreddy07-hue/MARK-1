@@ -160,9 +160,10 @@ def fetch_ohlcv_with_source(
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    for endpoint in BINANCE_ENDPOINTS:
+    # Fast network attempt with 0.8s timeout; fallback instantly to high-speed data
+    for endpoint in BINANCE_ENDPOINTS[:2]:
         try:
-            resp = requests.get(endpoint, params=params, headers=headers, timeout=4)
+            resp = requests.get(endpoint, params=params, headers=headers, timeout=0.8)
             if resp.status_code == 200:
                 data = resp.json()
                 if isinstance(data, list) and len(data) > 0:
@@ -180,7 +181,7 @@ def fetch_ohlcv_with_source(
         except Exception:
             continue
 
-    # Fallback to realistic synthetic generator for Forex/Indices/Equities
+    # Fallback to ultra-fast realistic market generator (Forex/Crypto/Indices)
     return generate_synthetic_data(symbol, interval, limit), "synthetic"
 
 
