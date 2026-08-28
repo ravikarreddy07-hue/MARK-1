@@ -44,13 +44,22 @@ class TradingViewChartManager {
         innerDiv.style.height = "100%";
         container.appendChild(innerDiv);
 
+        // Detect user's local browser timezone for TradingView
+        let userTz = "Etc/UTC";
+        try {
+            const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (detected) userTz = detected;
+        } catch (e) {
+            userTz = "Etc/UTC";
+        }
+
         if (typeof TradingView !== "undefined") {
             try {
                 this.widget = new TradingView.widget({
                     autosize: true,
                     symbol: this.currentSymbol,
                     interval: this.currentInterval,
-                    timezone: "Etc/UTC",
+                    timezone: userTz,
                     theme: "dark",
                     style: "1",
                     locale: "en",
