@@ -289,26 +289,27 @@ select.custom-select:focus, input.custom-input:focus {
   grid-template-columns: 1fr 380px;
   gap: 16px;
   padding: 16px 20px;
-  height: calc(100vh - 64px);
-  overflow: hidden;
+  min-height: calc(100vh - 64px);
+  height: auto;
+  align-items: start;
 }
 
+.chart-section,
 .left-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
 }
 
 .right-panel {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: 100%;
-  overflow-y: auto;
-  padding-right: 4px;
+  position: sticky;
+  top: 80px;
+  align-self: start;
 }
 
 /* Chart Container Card */
@@ -320,7 +321,7 @@ select.custom-select:focus, input.custom-input:focus {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  flex: 1;
+  height: 560px;
   min-height: 520px;
   position: relative;
 }
@@ -1427,7 +1428,12 @@ input:checked + .slider:before {
   .main-container {
     grid-template-columns: 1fr;
     height: auto;
-    overflow-y: auto;
+    overflow-y: visible;
+    padding: 12px;
+  }
+  .right-panel {
+    position: static;
+    top: auto;
   }
 }
 
