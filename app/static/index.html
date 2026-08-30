@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quantum Binary - TradingView Terminal & High-Precision Signal Engine</title>
-    <link rel="stylesheet" href="/static/css/styles.css?v=5.0">
+    <link rel="stylesheet" href="/static/css/styles.css?v=6.0">
     <!-- Official TradingView Advanced Real-Time Charting Library -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
@@ -116,38 +116,94 @@
                 </div>
             </div>
 
-            <!-- Bottom Trade Journal & Log -->
-            <div class="journal-card">
-                <div class="journal-header">
-                    <div class="journal-title">
-                        <span>Trade Journal & History</span>
-                        <span id="win-rate-pill" class="badge-winrate">Win Rate: --% (0/0)</span>
+            <!-- Bottom Deriv Automated Trading Command Center (Replaces Journal) -->
+            <div class="deriv-bot-card" id="deriv-bot-container">
+                <div class="deriv-bot-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="deriv-logo-pill">DERIV</span>
+                        <span class="deriv-bot-title">Automated Trading Bot Command Center</span>
                     </div>
-                    <div class="journal-stats">
-                        <span class="stat-item">Net PnL: <strong id="net-pnl-display" style="color: var(--call-color);">$0.00</strong></span>
-                        <button id="btn-clear-trades" class="btn-ghost" title="Clear all trades">Clear Log</button>
-                    </div>
+                    <span id="deriv-conn-status" class="deriv-status-badge disconnected">⚪ Disconnected</span>
                 </div>
 
-                <div class="trade-table-wrap">
-                    <table class="trade-table">
-                        <thead>
-                            <tr>
-                                <th>Time</th>
-                                <th>Asset</th>
-                                <th>TF</th>
-                                <th>Signal</th>
-                                <th>Trade Time</th>
-                                <th>Entry</th>
-                                <th>Exit</th>
-                                <th>Outcome</th>
-                                <th>PnL ($)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="trade-history-tbody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
+                <!-- Token Form (Shown when disconnected) -->
+                <div id="deriv-auth-section" class="deriv-section">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Connect Your Deriv API Token (Demo or Real):</label>
+                            <input type="password" id="deriv-token-input" class="custom-input" placeholder="Paste your Deriv API Token here..." style="width: 100%; font-size: 12px;">
+                        </div>
+                        <div style="padding-top: 18px;">
+                            <button id="btn-deriv-connect" class="btn-primary" style="padding: 9px 20px; font-size: 12px; font-weight: 700;">Connect Bot</button>
+                        </div>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">⚡ Automatically executes CALL / PUT contracts on your Deriv account when 5-pillar confluence reaches your minimum confidence threshold.</span>
+                </div>
+
+                <!-- Bot Dashboard (Shown when connected) -->
+                <div id="deriv-active-section" class="deriv-section" style="display: none;">
+                    <div class="deriv-bot-main-grid">
+                        <!-- Left: Account & Auto-Trade Switch -->
+                        <div class="deriv-sub-card">
+                            <div class="deriv-acct-bar">
+                                <div>
+                                    <span id="deriv-acct-login" style="font-size: 12px; font-weight: 800; color: #fff;">--</span>
+                                    <span id="deriv-acct-type" class="deriv-type-pill demo">DEMO</span>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span id="deriv-acct-balance" style="font-size: 14px; font-weight: 800; color: var(--call-color);">$0.00 USD</span>
+                                </div>
+                            </div>
+
+                            <div class="deriv-toggle-row" style="margin-top: 8px;">
+                                <div style="display: flex; flex-direction: column;">
+                                    <span style="font-size: 13px; font-weight: 800; color: #fff;">⚡ Auto-Trade Execution</span>
+                                    <span style="font-size: 11px; color: var(--text-secondary);">Auto-buys on Confirmed Signals</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="deriv-auto-switch">
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="deriv-stats-row" style="margin-top: 6px;">
+                                <span>Daily Bot PnL: <strong id="deriv-daily-pnl" style="color: var(--call-color);">$0.00</strong></span>
+                                <span>Win Rate: <strong id="deriv-bot-winrate">0% (0/0)</strong></span>
+                                <button id="btn-deriv-disconnect" class="btn-ghost" style="font-size: 11px; padding: 2px 8px;">Disconnect</button>
+                            </div>
+                        </div>
+
+                        <!-- Middle: Risk Rules & Parameters -->
+                        <div class="deriv-sub-card">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Bot Risk Parameters</div>
+                            <div class="deriv-config-grid">
+                                <div class="input-wrap">
+                                    <label>Stake ($)</label>
+                                    <input type="number" id="deriv-stake-input" class="custom-input" value="10" min="1" step="1">
+                                </div>
+                                <div class="input-wrap">
+                                    <label>Min Conf (%)</label>
+                                    <input type="number" id="deriv-conf-input" class="custom-input" value="75" min="60" max="95" step="5">
+                                </div>
+                                <div class="input-wrap">
+                                    <label>Take Profit ($)</label>
+                                    <input type="number" id="deriv-tp-input" class="custom-input" value="50" min="5" step="5">
+                                </div>
+                                <div class="input-wrap">
+                                    <label>Stop Loss ($)</label>
+                                    <input type="number" id="deriv-sl-input" class="custom-input" value="25" min="5" step="5">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Real-Time Bot Execution Terminal Log -->
+                        <div class="deriv-sub-card" style="flex: 1;">
+                            <div style="font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 6px;">Live Execution Stream</div>
+                            <div id="deriv-live-log" class="deriv-live-log" style="height: 105px; max-height: 105px;">
+                                <div class="deriv-log-line">🤖 Deriv Bot Connected. Monitoring 29 markets for confirmed confluence...</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -190,84 +246,6 @@
                     <div class="reasons-title">Confluence Indicators</div>
                     <div id="signal-reasons-list">
                         <!-- Populated dynamically -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Deriv Automated Trading Deck -->
-            <div class="deriv-bot-card" id="deriv-bot-container">
-                <div class="deriv-bot-header">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span class="deriv-logo-pill">DERIV</span>
-                        <span class="deriv-bot-title">Auto-Trading Bot</span>
-                    </div>
-                    <span id="deriv-conn-status" class="deriv-status-badge disconnected">⚪ Disconnected</span>
-                </div>
-
-                <!-- Token Form (Shown when disconnected) -->
-                <div id="deriv-auth-section" class="deriv-section">
-                    <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Connect Your Deriv API Token</label>
-                    <div style="display: flex; gap: 6px;">
-                        <input type="password" id="deriv-token-input" class="custom-input" placeholder="Paste Deriv API Token" style="flex: 1; font-size: 11px;">
-                        <button id="btn-deriv-connect" class="btn-primary" style="padding: 6px 12px; font-size: 11px;">Connect</button>
-                    </div>
-                    <span style="font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block;">Supports Demo (VRTC) & Real accounts. 100% Client-side token safety.</span>
-                </div>
-
-                <!-- Bot Dashboard (Shown when connected) -->
-                <div id="deriv-active-section" class="deriv-section" style="display: none;">
-                    <div class="deriv-acct-bar">
-                        <div>
-                            <span id="deriv-acct-login" style="font-size: 11px; font-weight: 700; color: #fff;">--</span>
-                            <span id="deriv-acct-type" class="deriv-type-pill demo">DEMO</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <span id="deriv-acct-balance" style="font-size: 13px; font-weight: 700; color: var(--call-color);">$0.00 USD</span>
-                        </div>
-                    </div>
-
-                    <!-- Auto-Trade Big Glowing Toggle -->
-                    <div class="deriv-toggle-row">
-                        <div style="display: flex; flex-direction: column;">
-                            <span style="font-size: 12px; font-weight: 700; color: #fff;">⚡ Auto-Trade Execution</span>
-                            <span style="font-size: 10px; color: var(--text-secondary);">Executes trades automatically on Confirmed Signals</span>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" id="deriv-auto-switch">
-                            <span class="slider round"></span>
-                        </label>
-                    </div>
-
-                    <!-- Bot Configuration Grid -->
-                    <div class="deriv-config-grid">
-                        <div class="input-wrap">
-                            <label>Stake ($)</label>
-                            <input type="number" id="deriv-stake-input" class="custom-input" value="10" min="1" step="1">
-                        </div>
-                        <div class="input-wrap">
-                            <label>Min Conf (%)</label>
-                            <input type="number" id="deriv-conf-input" class="custom-input" value="75" min="60" max="95" step="5">
-                        </div>
-                        <div class="input-wrap">
-                            <label>Take Profit ($)</label>
-                            <input type="number" id="deriv-tp-input" class="custom-input" value="50" min="5" step="5">
-                        </div>
-                        <div class="input-wrap">
-                            <label>Stop Loss ($)</label>
-                            <input type="number" id="deriv-sl-input" class="custom-input" value="25" min="5" step="5">
-                        </div>
-                    </div>
-
-                    <!-- Daily Bot Stats -->
-                    <div class="deriv-stats-row">
-                        <span>Daily PnL: <strong id="deriv-daily-pnl" style="color: var(--call-color);">$0.00</strong></span>
-                        <span>Win Rate: <strong id="deriv-bot-winrate">0% (0/0)</strong></span>
-                        <button id="btn-deriv-disconnect" class="btn-ghost" style="font-size: 10px; padding: 2px 6px;">Disconnect</button>
-                    </div>
-
-                    <!-- Live Bot Activity Log -->
-                    <div id="deriv-live-log" class="deriv-live-log">
-                        <div class="deriv-log-line">🤖 Bot standing by. Monitoring confluence setups...</div>
                     </div>
                 </div>
             </div>
@@ -569,7 +547,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Application JavaScript Bundles -->
-    <script src="/static/js/chart.js?v=5.0"></script>
-    <script src="/static/js/app.js?v=5.0"></script>
+    <script src="/static/js/chart.js?v=6.0"></script>
+    <script src="/static/js/app.js?v=6.0"></script>
 </body>
 </html>

@@ -1278,6 +1278,29 @@ select.custom-select:focus, input.custom-input:focus {
   gap: 8px;
 }
 
+.deriv-bot-main-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1.4fr;
+  gap: 12px;
+}
+
+.deriv-sub-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+@media (max-width: 1050px) {
+  .deriv-bot-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .deriv-acct-bar {
   display: flex;
   justify-content: space-between;

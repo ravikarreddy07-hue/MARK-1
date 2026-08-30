@@ -1,11 +1,11 @@
 [
   {
-    "id": "89f51f82",
+    "id": "6aa19c51",
     "symbol": "EURUSD",
     "timeframe": "1m",
     "signal": "CALL",
-    "entry_time": 1788086218,
-    "expiry_time": 1788086278,
+    "entry_time": 1788086703,
+    "expiry_time": 1788086763,
     "duration_seconds": 60,
     "entry_price": 1.085,
     "exit_price": null,
@@ -14,6 +14,22 @@
     "pnl": 0.0,
     "status": "ACTIVE",
     "outcome": "PENDING"
+  },
+  {
+    "id": "89f51f82",
+    "symbol": "EURUSD",
+    "timeframe": "1m",
+    "signal": "CALL",
+    "entry_time": 1788086218,
+    "expiry_time": 1788086278,
+    "duration_seconds": 60,
+    "entry_price": 1.085,
+    "exit_price": 1.087,
+    "stake": 25.0,
+    "payout_rate": 0.85,
+    "pnl": 21.25,
+    "status": "CLOSED",
+    "outcome": "WIN"
   },
   {
     "id": "b3c8387b",
