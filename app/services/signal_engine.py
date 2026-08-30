@@ -436,15 +436,29 @@ def generate_all_signals(
                 "text": f"CALL {sig['confidence']}%",
                 "id": f"call_{sig['time']}",
             })
-        elif sig["signal"] == "PUT":
-            markers.append({
-                "time": sig["time"],
-                "position": "aboveBar",
-                "color": "#FF5252",
-                "shape": "arrowDown",
-                "text": f"PUT {sig['confidence']}%",
-                "id": f"put_{sig['time']}",
-            })
+    # Determine primary actionable signal (Prioritize Confirmed Closed Candle over flickering forming bar)
+    current_signal = None
+    if len(history) >= 2:
+        last_closed_sig = history[-2]
+        forming_sig = history[-1]
 
-    current_signal = history[-1] if history else None
+        # If the last closed candle confirmed a CALL or PUT, latch it as the primary confirmed signal
+        if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= 60.0:
+            current_signal = dict(last_closed_sig)
+            current_signal["status"] = "CONFIRMED"
+            current_signal["status_label"] = "🟢 Confirmed Setup (Closed Candle)"
+            current_signal["is_confirmed"] = True
+        elif forming_sig.get("signal") in ("CALL", "PUT"):
+            current_signal = dict(forming_sig)
+            current_signal["status"] = "FORMING"
+            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= 75 else "🟡 Forming (Wait for Candle Close)"
+            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= 75
+        else:
+            current_signal = dict(forming_sig)
+            current_signal["status"] = "NEUTRAL"
+            current_signal["status_label"] = "⚪ Market Consolidation"
+            current_signal["is_confirmed"] = False
+    elif history:
+        current_signal = history[-1]
+
     return {"current": current_signal, "markers": markers, "history": history}

@@ -1,5 +1,6 @@
 import os
 import time
+import asyncio
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, Query, HTTPException, Body
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +14,7 @@ from app.services.signal_engine import generate_all_signals, evaluate_candle_sig
 from app.services.backtester import run_backtest
 from app.services.optimizer import optimize_strategy
 from app.services.trade_manager import trade_manager
+from app.services.deriv_auto_trader import deriv_trader
 
 app = FastAPI(title="Quantum Binary - TradingView Terminal API", version="2.0.0")
 
@@ -68,6 +70,27 @@ class OptimizeRequest(BaseModel):
     payout_rate: float = Field(0.85, gt=0.0, le=1.0)
     stake: float = Field(10.0, gt=0.0)
 
+class DerivConnectRequest(BaseModel):
+    token: str = Field(..., min_length=5, max_length=150)
+
+class DerivConfigRequest(BaseModel):
+    default_stake: Optional[float] = Field(None, gt=0.0)
+    min_confidence: Optional[int] = Field(None, ge=50, le=100)
+    preferred_duration: Optional[int] = Field(None, ge=1, le=1440)
+    duration_unit: Optional[str] = Field(None, pattern="^(s|m|h|d)$")
+    take_profit_daily: Optional[float] = Field(None, ge=0.0)
+    stop_loss_daily: Optional[float] = Field(None, ge=0.0)
+    max_concurrent_trades: Optional[int] = Field(None, ge=1, le=10)
+    cooldown_seconds: Optional[int] = Field(None, ge=10, le=600)
+    is_auto_trading_enabled: Optional[bool] = None
+
+class DerivManualTradeRequest(BaseModel):
+    symbol: str = Field("EURUSD", min_length=1, max_length=30)
+    signal: str = Field(..., pattern="^(CALL|PUT)$")
+    stake: Optional[float] = Field(10.0, gt=0.0)
+    duration: Optional[int] = Field(5, ge=1, le=1440)
+    duration_unit: Optional[str] = Field("m", pattern="^(s|m|h|d)$")
+
 
 @app.get("/api/market-data")
 def get_market_data(
@@ -118,6 +141,15 @@ def get_market_data(
     current_signal = signal_data["current"]
     markers = signal_data["markers"]
     
+    # Auto-execute trade on Deriv if enabled
+    if current_signal and current_signal.get("signal") in ("CALL", "PUT") and deriv_trader.is_auto_trading_enabled:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(deriv_trader.evaluate_auto_trade_signal(current_signal, symbol))
+        except Exception:
+            pass
+
     return {
         "symbol": symbol.upper(),
         "interval": interval,
@@ -396,6 +428,51 @@ def clear_trades():
     """Clears trade journal."""
     trade_manager.clear_history()
     return {"message": "Trade history cleared"}
+
+
+# ─── DERIV AUTOMATED TRADING BOT ENDPOINTS ────────────────────────────────────
+
+@app.post("/api/deriv/connect")
+async def deriv_connect(req: DerivConnectRequest):
+    """Connects and authorizes with Deriv WebSocket API."""
+    res = await deriv_trader.connect(req.token)
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Connection failed"))
+    return res
+
+
+@app.get("/api/deriv/status")
+def get_deriv_status():
+    """Returns real-time status of Deriv auto-trader, active contracts, and daily PnL."""
+    return deriv_trader.get_status()
+
+
+@app.post("/api/deriv/config")
+def update_deriv_config(req: DerivConfigRequest):
+    """Updates auto-trading parameters and risk rules."""
+    config_updates = req.model_dump(exclude_unset=True)
+    return deriv_trader.update_config(config_updates)
+
+
+@app.post("/api/deriv/trade")
+async def execute_deriv_trade(req: DerivManualTradeRequest):
+    """Executes a manual or automated trade contract directly on Deriv."""
+    res = await deriv_trader.execute_trade(
+        symbol=req.symbol,
+        signal_type=req.signal,
+        stake=req.stake,
+        duration=req.duration,
+        duration_unit=req.duration_unit,
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res.get("error", "Trade execution failed"))
+    return res
+
+
+@app.post("/api/deriv/disconnect")
+async def deriv_disconnect():
+    """Disconnects from Deriv and halts auto-trading."""
+    return await deriv_trader.disconnect()
 
 
 # Mount static directory for frontend assets

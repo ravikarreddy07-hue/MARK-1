@@ -147,3 +147,43 @@ def test_forex_and_commodities_market_data():
         data = res.json()
         assert len(data["candles"]) == 50
         assert data["signal"] is not None
+
+
+def test_deriv_auto_trader_module():
+    from app.services.deriv_auto_trader import DerivAutoTrader, DERIV_SYMBOL_MAP
+
+    trader = DerivAutoTrader()
+    # 1. Test symbol mapping
+    assert trader.map_symbol("EURUSD") == "frxEURUSD"
+    assert trader.map_symbol("BTCUSDT") == "cryBTCUSD"
+    assert trader.map_symbol("R_100") == "R_100"
+
+    # 2. Test configuration updates
+    res = trader.update_config({
+        "default_stake": 20.0,
+        "min_confidence": 80,
+        "is_auto_trading_enabled": True,
+        "take_profit_daily": 100.0,
+        "stop_loss_daily": 30.0,
+    })
+    assert res["success"] is True
+    assert trader.config["default_stake"] == 20.0
+    assert trader.config["min_confidence"] == 80
+    assert trader.is_auto_trading_enabled is True
+
+    # 3. Test status retrieval
+    status = trader.get_status()
+    assert "is_connected" in status
+    assert "is_auto_trading_enabled" in status
+    assert status["is_auto_trading_enabled"] is True
+    assert "stats" in status
+
+    # 4. Test endpoints via TestClient
+    res_status = client.get("/api/deriv/status")
+    assert res_status.status_code == 200
+    assert "is_auto_trading_enabled" in res_status.json()
+
+    res_cfg = client.post("/api/deriv/config", json={"default_stake": 15.0, "min_confidence": 75})
+    assert res_cfg.status_code == 200
+    assert res_cfg.json()["config"]["default_stake"] == 15.0
+

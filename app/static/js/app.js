@@ -161,6 +161,7 @@ class BinaryApp {
         await this.loadMarketData();
         await this.loadTradeHistory();
         await this.loadSignalsStream();
+        this.initDerivBot();
         this.startPolling();
     }
 
@@ -380,7 +381,8 @@ class BinaryApp {
 
         let filtered = this.streamData;
         if (this.streamFilter === "high_conf") {
-            filtered = this.streamData.filter((s) => s.signal !== "NEUTRAL" && s.confidence >= 70);
+            // Show ONLY Forex pairs with actionable confirmed signals
+            filtered = this.streamData.filter((s) => s.market === "Forex" && s.signal !== "NEUTRAL" && s.confidence >= 65);
         } else if (this.streamFilter !== "all") {
             filtered = this.streamData.filter((s) => s.market.toLowerCase() === this.streamFilter.toLowerCase());
         }
@@ -535,6 +537,16 @@ class BinaryApp {
         const type = signal.signal || "NEUTRAL";
         const conf = signal.confidence || 0;
         const entry = signal.entry_price || currentPrice;
+
+        const modelBadge = document.getElementById("signal-model-badge");
+        if (modelBadge) {
+            if (signal.status_label) {
+                modelBadge.textContent = signal.status_label;
+                modelBadge.style.color = signal.status === "CONFIRMED" ? "var(--call-color)" : (signal.status === "FORMING" ? "#ffca28" : "var(--accent-blue)");
+            } else {
+                modelBadge.textContent = "V3 AI CONFLUENCE";
+            }
+        }
 
         if (banner) {
             banner.className = `signal-banner ${type.toLowerCase()}`;
@@ -929,6 +941,190 @@ class BinaryApp {
             else ctx.lineTo(x, y);
         });
         ctx.stroke();
+    }
+
+    // ─── DERIV AUTO-TRADING BOT CONTROLLER ──────────────────────────
+    initDerivBot() {
+        const btnConnect = document.getElementById("btn-deriv-connect");
+        const btnDisconnect = document.getElementById("btn-deriv-disconnect");
+        const autoSwitch = document.getElementById("deriv-auto-switch");
+        const stakeInput = document.getElementById("deriv-stake-input");
+        const confInput = document.getElementById("deriv-conf-input");
+        const tpInput = document.getElementById("deriv-tp-input");
+        const slInput = document.getElementById("deriv-sl-input");
+
+        // Restore saved token
+        const savedToken = localStorage.getItem("qb_deriv_token");
+        if (savedToken) {
+            const tokenField = document.getElementById("deriv-token-input");
+            if (tokenField) tokenField.value = savedToken;
+            this.connectDeriv(savedToken);
+        }
+
+        btnConnect?.addEventListener("click", () => {
+            const token = document.getElementById("deriv-token-input")?.value?.trim();
+            if (!token) {
+                this.showToast("Please enter your Deriv API Token", "loss");
+                return;
+            }
+            this.connectDeriv(token);
+        });
+
+        btnDisconnect?.addEventListener("click", () => {
+            this.disconnectDeriv();
+        });
+
+        autoSwitch?.addEventListener("change", (e) => {
+            const enabled = e.target.checked;
+            this.updateDerivConfig({ is_auto_trading_enabled: enabled });
+            if (enabled) {
+                this.showToast("⚡ Deriv Auto-Trading is now ACTIVE! Bot will execute confirmed signals.", "win");
+            } else {
+                this.showToast("⏸️ Deriv Auto-Trading PAUSED.", "info");
+            }
+        });
+
+        [stakeInput, confInput, tpInput, slInput].forEach((inp) => {
+            inp?.addEventListener("change", () => {
+                this.updateDerivConfig({
+                    default_stake: parseFloat(stakeInput?.value || 10),
+                    min_confidence: parseInt(confInput?.value || 75),
+                    take_profit_daily: parseFloat(tpInput?.value || 50),
+                    stop_loss_daily: parseFloat(slInput?.value || 25),
+                });
+            });
+        });
+
+        // Periodic bot status polling
+        setInterval(() => this.pollDerivStatus(), 3500);
+    }
+
+    async connectDeriv(token) {
+        const btnConnect = document.getElementById("btn-deriv-connect");
+        if (btnConnect) {
+            btnConnect.disabled = true;
+            btnConnect.textContent = "Connecting...";
+        }
+
+        try {
+            const res = await fetch("/api/deriv/connect", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: token }),
+            });
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                this.showToast(data.detail || data.error || "Failed to connect to Deriv", "loss");
+                if (btnConnect) {
+                    btnConnect.disabled = false;
+                    btnConnect.textContent = "Connect";
+                }
+                return;
+            }
+
+            localStorage.setItem("qb_deriv_token", token);
+            this.showToast(`✅ Connected to Deriv (${data.account?.is_virtual ? "Demo" : "Real"}: ${data.account?.loginid})`, "win");
+            this.pollDerivStatus();
+        } catch (e) {
+            console.error("Deriv connect error:", e);
+            this.showToast("Error connecting to Deriv API", "loss");
+        } finally {
+            if (btnConnect) {
+                btnConnect.disabled = false;
+                btnConnect.textContent = "Connect";
+            }
+        }
+    }
+
+    async disconnectDeriv() {
+        try {
+            await fetch("/api/deriv/disconnect", { method: "POST" });
+            localStorage.removeItem("qb_deriv_token");
+            this.showToast("Disconnected from Deriv", "info");
+            this.pollDerivStatus();
+        } catch (e) {
+            console.error("Deriv disconnect error:", e);
+        }
+    }
+
+    async updateDerivConfig(updates) {
+        try {
+            await fetch("/api/deriv/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+            });
+        } catch (e) {
+            console.error("Deriv config update error:", e);
+        }
+    }
+
+    async pollDerivStatus() {
+        try {
+            const res = await fetch("/api/deriv/status");
+            if (!res.ok) return;
+            const data = await res.json();
+            this.renderDerivStatus(data);
+        } catch (e) {
+            // Silently ignore background polling glitches
+        }
+    }
+
+    renderDerivStatus(data) {
+        const authSec = document.getElementById("deriv-auth-section");
+        const actSec = document.getElementById("deriv-active-section");
+        const statusBadge = document.getElementById("deriv-conn-status");
+        const loginEl = document.getElementById("deriv-acct-login");
+        const typeEl = document.getElementById("deriv-acct-type");
+        const balEl = document.getElementById("deriv-acct-balance");
+        const switchEl = document.getElementById("deriv-auto-switch");
+        const pnlEl = document.getElementById("deriv-daily-pnl");
+        const winrateEl = document.getElementById("deriv-bot-winrate");
+        const logEl = document.getElementById("deriv-live-log");
+
+        if (data.is_authorized) {
+            if (authSec) authSec.style.display = "none";
+            if (actSec) actSec.style.display = "flex";
+            if (statusBadge) {
+                statusBadge.className = "deriv-status-badge connected";
+                statusBadge.textContent = "🟢 Connected";
+            }
+            if (loginEl) loginEl.textContent = data.account?.loginid || "--";
+            if (typeEl) {
+                typeEl.className = `deriv-type-pill ${data.account?.is_virtual ? "demo" : "real"}`;
+                typeEl.textContent = data.account?.is_virtual ? "DEMO" : "REAL";
+            }
+            if (balEl) {
+                balEl.textContent = `$${Number(data.account?.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${data.account?.currency || "USD"}`;
+            }
+            if (switchEl) {
+                switchEl.checked = data.is_auto_trading_enabled;
+            }
+            if (pnlEl) {
+                const pnl = data.stats?.daily_pnl || 0;
+                pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;
+                pnlEl.style.color = pnl >= 0 ? "var(--call-color)" : "var(--put-color)";
+            }
+            if (winrateEl) {
+                winrateEl.textContent = `${data.stats?.win_rate || 0}% (${data.stats?.won_trades || 0}/${data.stats?.total_trades || 0})`;
+            }
+
+            // Render live activity feed
+            if (logEl && data.recent_activity && data.recent_activity.length > 0) {
+                logEl.innerHTML = data.recent_activity.slice(0, 10).map((a) => {
+                    const color = a.level === "success" ? "var(--call-color)" : (a.level === "error" || a.level === "warning" ? "var(--put-color)" : "#8b9bb4");
+                    return `<div class="deriv-log-line" style="color: ${color};">[${a.time_str}] ${escapeHtml(a.message)}</div>`;
+                }).join("");
+            }
+        } else {
+            if (authSec) authSec.style.display = "flex";
+            if (actSec) actSec.style.display = "none";
+            if (statusBadge) {
+                statusBadge.className = "deriv-status-badge disconnected";
+                statusBadge.textContent = "⚪ Disconnected";
+            }
+        }
     }
 
     showToast(message, type = "info") {
