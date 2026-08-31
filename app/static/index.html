@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quantum Binary - TradingView Terminal & High-Precision Signal Engine</title>
-    <link rel="stylesheet" href="/static/css/styles.css?v=7.0">
+    <link rel="stylesheet" href="/static/css/styles.css?v=8.0">
     <!-- Official TradingView Advanced Real-Time Charting Library -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
@@ -128,7 +128,7 @@
 
                 <!-- Token Form (Shown when disconnected) -->
                 <div id="deriv-auth-section" class="deriv-section">
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 250px;">
                             <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Connect Your Deriv API Token (Demo or Real):</label>
                             <input type="password" id="deriv-token-input" class="custom-input" placeholder="Paste your Deriv API Token here..." style="width: 100%; font-size: 12px;">
@@ -137,7 +137,10 @@
                             <button id="btn-deriv-connect" class="btn-primary" style="padding: 9px 20px; font-size: 12px; font-weight: 700;">Connect Bot</button>
                         </div>
                     </div>
-                    <span style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">⚡ Automatically executes CALL / PUT contracts on your Deriv account when 5-pillar confluence reaches your minimum confidence threshold.</span>
+                    <div id="deriv-auth-error" style="display: none; color: var(--put-color); font-size: 11px; font-weight: 600; margin-top: 4px; background: rgba(255, 61, 87, 0.1); border: 1px solid rgba(255, 61, 87, 0.3); border-radius: 6px; padding: 6px 10px;"></div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                        📌 <strong>How to get your Deriv API Token:</strong> Log in to <a href="https://app.deriv.com/account/api-token" target="_blank" style="color: var(--accent-cyan); text-decoration: underline;">app.deriv.com/account/api-token</a> ➔ Select <strong>Read</strong> &amp; <strong>Trade</strong> checkboxes ➔ Enter Token Name ➔ Click <strong>Create</strong> ➔ Copy &amp; Paste token here.
+                    </div>
                 </div>
 
                 <!-- Bot Dashboard (Shown when connected) -->
@@ -547,7 +550,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Application JavaScript Bundles -->
-    <script src="/static/js/chart.js?v=7.0"></script>
-    <script src="/static/js/app.js?v=7.0"></script>
+    <script src="/static/js/chart.js?v=8.0"></script>
+    <script src="/static/js/app.js?v=8.0"></script>
 </body>
 </html>

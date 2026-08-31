@@ -1001,21 +1001,30 @@ class BinaryApp {
 
     async connectDeriv(token) {
         const btnConnect = document.getElementById("btn-deriv-connect");
+        const errEl = document.getElementById("deriv-auth-error");
+        if (errEl) errEl.style.display = "none";
+
         if (btnConnect) {
             btnConnect.disabled = true;
             btnConnect.textContent = "Connecting...";
         }
 
         try {
+            const cleanToken = token.trim().replace(/['"\r\n\s]/g, "");
             const res = await fetch("/api/deriv/connect", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: token }),
+                body: JSON.stringify({ token: cleanToken }),
             });
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                this.showToast(data.detail || data.error || "Failed to connect to Deriv", "loss");
+                const errMsg = data.detail || data.error || "Failed to connect to Deriv";
+                if (errEl) {
+                    errEl.style.display = "block";
+                    errEl.textContent = `❌ ${errMsg}`;
+                }
+                this.showToast(errMsg, "loss");
                 if (btnConnect) {
                     btnConnect.disabled = false;
                     btnConnect.textContent = "Connect";
@@ -1023,12 +1032,18 @@ class BinaryApp {
                 return;
             }
 
-            localStorage.setItem("qb_deriv_token", token);
+            if (errEl) errEl.style.display = "none";
+            localStorage.setItem("qb_deriv_token", cleanToken);
             this.showToast(`✅ Connected to Deriv (${data.account?.is_virtual ? "Demo" : "Real"}: ${data.account?.loginid})`, "win");
             this.pollDerivStatus();
         } catch (e) {
             console.error("Deriv connect error:", e);
-            this.showToast("Error connecting to Deriv API", "loss");
+            const errMsg = "Error connecting to server. Please check your connection or retry.";
+            if (errEl) {
+                errEl.style.display = "block";
+                errEl.textContent = `❌ ${errMsg}`;
+            }
+            this.showToast(errMsg, "loss");
         } finally {
             if (btnConnect) {
                 btnConnect.disabled = false;

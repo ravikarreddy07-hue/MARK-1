@@ -110,10 +110,17 @@ class DerivAutoTrader:
 
     async def connect(self, token: str) -> Dict[str, Any]:
         """Connects and authorizes with Deriv WebSocket API."""
-        self.api_token = token.strip()
+        clean_token = token.strip().replace('"', '').replace("'", "").replace("\n", "").replace("\r", "").replace(" ", "")
+        self.api_token = clean_token
         self._running = True
         
         try:
+            if self.ws:
+                try:
+                    await self.ws.close()
+                except Exception:
+                    pass
+            
             self.ws = await websockets.connect(DERIV_WS_URL, ping_interval=30, ping_timeout=10)
             self.is_connected = True
             
@@ -126,9 +133,14 @@ class DerivAutoTrader:
             auth_res = await self._send_request({"authorize": self.api_token})
             
             if "error" in auth_res:
-                err_msg = auth_res["error"].get("message", "Authorization failed")
+                err_code = auth_res["error"].get("code", "")
+                raw_msg = auth_res["error"].get("message", "Authorization failed")
+                if "InvalidToken" in err_code:
+                    err_msg = "Deriv rejected the token ('Invalid Token'). Please ensure you created the token in Deriv Account Settings with 'Read' and 'Trade' scopes enabled."
+                else:
+                    err_msg = f"Deriv Auth Error: {raw_msg}"
                 self.is_authorized = False
-                self.log_activity(f"Authorization error: {err_msg}", "error")
+                self.log_activity(err_msg, "error")
                 return {"success": False, "error": err_msg}
                 
             auth_data = auth_res.get("authorize", {})
