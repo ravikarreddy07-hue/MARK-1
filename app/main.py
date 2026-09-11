@@ -144,14 +144,17 @@ def get_market_data(
     # Auto-execute trade on Deriv if enabled
     if current_signal and current_signal.get("signal") in ("CALL", "PUT") and deriv_trader.is_auto_trading_enabled:
         try:
-            asyncio.create_task(
-                deriv_trader.on_signal_received(
-                    symbol=symbol,
-                    signal_data=current_signal,
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(
+                    deriv_trader.on_signal_received(
+                        symbol=symbol,
+                        signal_data=current_signal,
+                    )
                 )
-            )
         except Exception:
             pass
+
 
     return {
         "symbol": symbol.upper(),

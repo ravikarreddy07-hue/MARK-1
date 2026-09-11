@@ -347,10 +347,13 @@ def evaluate_candle_signal(
     else:
         suggested_time = "1hr"
         suggested_secs = 3600
+        suggested_label = "1 Hr (Long-Term Swing)"
+
     max_score = (WEIGHT_RSI_EXTREME + WEIGHT_STOCHRSI_CROSS + WEIGHT_BB_PIERCE
                  + WEIGHT_BB_CLOSE_INSIDE + WEIGHT_WICK_STRENGTH + WEIGHT_ENGULF
                  + WEIGHT_MACD_CROSS + WEIGHT_ATR_FAVORABLE + WEIGHT_EMA_PULL
                  + WEIGHT_CONSECUTIVE_RUN)
+
 
     if (bull_pillars >= 4
             and bull_score >= MIN_BULL_SCORE
@@ -436,6 +439,16 @@ def generate_all_signals(
                 "text": f"CALL {sig['confidence']}%",
                 "id": f"call_{sig['time']}",
             })
+        elif sig["signal"] == "PUT":
+            markers.append({
+                "time": sig["time"],
+                "position": "aboveBar",
+                "color": "#FF1744",
+                "shape": "arrowDown",
+                "text": f"PUT {sig['confidence']}%",
+                "id": f"put_{sig['time']}",
+            })
+
     # Determine primary actionable signal (Prioritize Confirmed Closed Candle over flickering forming bar)
     current_signal = None
     if len(history) >= 2:
