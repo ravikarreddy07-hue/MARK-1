@@ -34,7 +34,7 @@ class TradeCreateRequest(BaseModel):
     duration_seconds: int = Field(300, ge=5, le=86400)
     stake: float = Field(10.0, gt=0.0)
     payout_rate: float = Field(0.85, gt=0.0, le=1.0)
-    timeframe: str = Field("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$")
+    timeframe: str = Field("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$")
 
 class TradeUpdateRequest(BaseModel):
     outcome: str = Field(..., pattern="^(WIN|LOSS|TIE)$")
@@ -46,7 +46,7 @@ class ResolveTradeRequest(BaseModel):
 
 class BacktestRequest(BaseModel):
     symbol: str = Field("BTCUSDT", min_length=1, max_length=30)
-    timeframe: str = Field("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$")
+    timeframe: str = Field("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$")
     expiry_duration: str = Field("5min", pattern="^(30s|1min|2min|3min|5min|15min|30min|1hr)$")
     limit: int = Field(500, ge=50, le=1000)
     payout_rate: float = Field(0.85, gt=0.0, le=1.0)
@@ -64,7 +64,7 @@ class BacktestRequest(BaseModel):
 
 class OptimizeRequest(BaseModel):
     symbol: str = Field("BTCUSDT", min_length=1, max_length=30)
-    timeframe: str = Field("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$")
+    timeframe: str = Field("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$")
     expiry_duration: str = Field("5min", pattern="^(30s|1min|2min|3min|5min|15min|30min|1hr)$")
     limit: int = Field(1000, ge=100, le=1000)
     payout_rate: float = Field(0.85, gt=0.0, le=1.0)
@@ -95,7 +95,7 @@ class DerivManualTradeRequest(BaseModel):
 @app.get("/api/market-data")
 def get_market_data(
     symbol: str = Query("BTCUSDT", min_length=1, max_length=30, description="Trading pair symbol"),
-    interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$", description="Candle timeframe"),
+    interval: str = Query("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$", description="Candle timeframe"),
     limit: int = Query(500, ge=50, le=1000, description="Number of candles"),
     end_time: Optional[int] = Query(None, description="End timestamp for historical inspection"),
     rsi_period: int = Query(9, ge=2, le=200),
@@ -144,9 +144,12 @@ def get_market_data(
     # Auto-execute trade on Deriv if enabled
     if current_signal and current_signal.get("signal") in ("CALL", "PUT") and deriv_trader.is_auto_trading_enabled:
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(deriv_trader.evaluate_auto_trade_signal(current_signal, symbol))
+            asyncio.create_task(
+                deriv_trader.on_signal_received(
+                    symbol=symbol,
+                    signal_data=current_signal,
+                )
+            )
         except Exception:
             pass
 
@@ -164,7 +167,7 @@ def get_market_data(
 @app.get("/api/signal-at-time")
 def get_signal_at_time(
     symbol: str = Query("BTCUSDT", min_length=1, max_length=30),
-    interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
+    interval: str = Query("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$"),
     target_time: int = Query(..., description="UNIX timestamp in seconds of candle to inspect"),
     limit: int = Query(200, ge=50, le=500),
     rsi_period: int = Query(9, ge=2, le=200),
@@ -211,7 +214,7 @@ def get_signal_at_time(
 @app.get("/api/backtest")
 def get_backtest(
     symbol: str = Query("BTCUSDT", min_length=1, max_length=30),
-    timeframe: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
+    timeframe: str = Query("1m", pattern="^(1m|2m|3m|5m|15m|30m|1h|4h|1d)$"),
     expiry_duration: str = Query("5min", pattern="^(30s|1min|2min|3min|5min|15min|30min|1hr)$"),
     limit: int = Query(500, ge=50, le=1000),
     payout_rate: float = Query(0.85, gt=0.0, le=1.0),

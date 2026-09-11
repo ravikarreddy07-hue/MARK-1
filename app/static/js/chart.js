@@ -17,6 +17,8 @@ class TradingViewChartManager {
     mapIntervalToTv(interval) {
         const map = {
             "1m": "1",
+            "2m": "2",
+            "3m": "3",
             "5m": "5",
             "15m": "15",
             "30m": "30",

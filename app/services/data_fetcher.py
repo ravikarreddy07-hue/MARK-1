@@ -5,6 +5,8 @@ from typing import List, Dict, Any, Optional, Tuple
 
 INTERVAL_MAP = {
     "1m": "1m",
+    "2m": "2m",
+    "3m": "3m",
     "5m": "5m",
     "15m": "15m",
     "30m": "30m",
@@ -15,6 +17,8 @@ INTERVAL_MAP = {
 
 INTERVAL_SECONDS = {
     "1m": 60,
+    "2m": 120,
+    "3m": 180,
     "5m": 300,
     "15m": 900,
     "30m": 1800,
@@ -29,6 +33,70 @@ BINANCE_ENDPOINTS = [
     "https://api1.binance.com/api/v3/klines",
     "https://api2.binance.com/api/v3/klines",
     "https://api3.binance.com/api/v3/klines",
+]
+
+ASSET_CATALOG = [
+    {
+        "group": "💱 Major Forex Pairs",
+        "symbols": [
+            {"value": "EURUSD", "tvSymbol": "FX:EURUSD", "label": "EUR / USD (Euro / US Dollar)"},
+            {"value": "GBPUSD", "tvSymbol": "FX:GBPUSD", "label": "GBP / USD (British Pound / USD)"},
+            {"value": "USDJPY", "tvSymbol": "FX:USDJPY", "label": "USD / JPY (US Dollar / Yen)"},
+            {"value": "AUDUSD", "tvSymbol": "FX:AUDUSD", "label": "AUD / USD (Aussie / USD)"},
+            {"value": "USDCAD", "tvSymbol": "FX:USDCAD", "label": "USD / CAD (USD / Canadian Dollar)"},
+            {"value": "USDCHF", "tvSymbol": "FX:USDCHF", "label": "USD / CHF (USD / Swiss Franc)"},
+            {"value": "NZDUSD", "tvSymbol": "FX:NZDUSD", "label": "NZD / USD (Kiwi / USD)"},
+        ]
+    },
+    {
+        "group": "🌐 Cross Forex Pairs",
+        "symbols": [
+            {"value": "EURGBP", "tvSymbol": "FX:EURGBP", "label": "EUR / GBP (Euro / Pound)"},
+            {"value": "EURJPY", "tvSymbol": "FX:EURJPY", "label": "EUR / JPY (Euro / Yen)"},
+            {"value": "GBPJPY", "tvSymbol": "FX:GBPJPY", "label": "GBP / JPY (Pound / Yen)"},
+            {"value": "AUDJPY", "tvSymbol": "FX:AUDJPY", "label": "AUD / JPY (Aussie / Yen)"},
+            {"value": "EURAUD", "tvSymbol": "FX:EURAUD", "label": "EUR / AUD (Euro / Aussie)"},
+            {"value": "GBPAUD", "tvSymbol": "FX:GBPAUD", "label": "GBP / AUD (Pound / Aussie)"},
+            {"value": "USDINR", "tvSymbol": "FX_IDC:USDINR", "label": "USD / INR (USD / Rupee)"},
+        ]
+    },
+    {
+        "group": "🔥 Top Cryptocurrencies",
+        "symbols": [
+            {"value": "BTCUSDT", "tvSymbol": "BINANCE:BTCUSDT", "label": "BTC / USDT (Bitcoin)"},
+            {"value": "ETHUSDT", "tvSymbol": "BINANCE:ETHUSDT", "label": "ETH / USDT (Ethereum)"},
+            {"value": "SOLUSDT", "tvSymbol": "BINANCE:SOLUSDT", "label": "SOL / USDT (Solana)"},
+            {"value": "BNBUSDT", "tvSymbol": "BINANCE:BNBUSDT", "label": "BNB / USDT (Binance Coin)"},
+            {"value": "XRPUSDT", "tvSymbol": "BINANCE:XRPUSDT", "label": "XRP / USDT (Ripple)"},
+            {"value": "DOGEUSDT", "tvSymbol": "BINANCE:DOGEUSDT", "label": "DOGE / USDT (Dogecoin)"},
+            {"value": "ADAUSDT", "tvSymbol": "BINANCE:ADAUSDT", "label": "ADA / USDT (Cardano)"},
+            {"value": "AVAXUSDT", "tvSymbol": "BINANCE:AVAXUSDT", "label": "AVAX / USDT (Avalanche)"},
+            {"value": "LINKUSDT", "tvSymbol": "BINANCE:LINKUSDT", "label": "LINK / USDT (Chainlink)"},
+            {"value": "PEPEUSDT", "tvSymbol": "BINANCE:PEPEUSDT", "label": "PEPE / USDT (Pepe)"},
+            {"value": "SHIBUSDT", "tvSymbol": "BINANCE:SHIBUSDT", "label": "SHIB / USDT (Shiba Inu)"},
+            {"value": "SUIUSDT", "tvSymbol": "BINANCE:SUIUSDT", "label": "SUI / USDT (Sui)"},
+            {"value": "NEARUSDT", "tvSymbol": "BINANCE:NEARUSDT", "label": "NEAR / USDT (NEAR)"},
+            {"value": "LTCUSDT", "tvSymbol": "BINANCE:LTCUSDT", "label": "LTC / USDT (Litecoin)"},
+        ]
+    },
+    {
+        "group": "🥇 Commodities & Metals",
+        "symbols": [
+            {"value": "GOLD", "tvSymbol": "TVC:GOLD", "label": "Gold (XAU / USD)"},
+            {"value": "SILVER", "tvSymbol": "TVC:SILVER", "label": "Silver (XAG / USD)"},
+            {"value": "USOIL", "tvSymbol": "TVC:USOIL", "label": "Crude Oil (WTI)"},
+        ]
+    },
+    {
+        "group": "⚡ Deriv Synthetic Indices",
+        "symbols": [
+            {"value": "R_100", "tvSymbol": "DERIV:R_100", "label": "Volatility 100 Index"},
+            {"value": "R_75", "tvSymbol": "DERIV:R_75", "label": "Volatility 75 Index"},
+            {"value": "R_50", "tvSymbol": "DERIV:R_50", "label": "Volatility 50 Index"},
+            {"value": "R_25", "tvSymbol": "DERIV:R_25", "label": "Volatility 25 Index"},
+            {"value": "R_10", "tvSymbol": "DERIV:R_10", "label": "Volatility 10 Index"},
+        ]
+    }
 ]
 
 def generate_synthetic_data(symbol: str, interval: str, limit: int = 500) -> List[Dict[str, Any]]:
