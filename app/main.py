@@ -10,7 +10,13 @@ from pydantic import BaseModel, Field
 
 from app.services.data_fetcher import fetch_ohlcv, fetch_ohlcv_with_source, INTERVAL_SECONDS
 from app.services.indicators import compute_all_indicators
-from app.services.signal_engine import generate_all_signals, evaluate_candle_signal, detect_asset_type, ENGINE_PRESETS
+from app.services.signal_engine import (
+    generate_all_signals,
+    evaluate_candle_signal,
+    detect_asset_type,
+    ENGINE_PRESETS,
+    ELITE_70_SYMBOLS,
+)
 from app.services.backtester import run_backtest
 from app.services.optimizer import optimize_strategy
 from app.services.trade_manager import trade_manager
@@ -109,6 +115,7 @@ def get_market_data(
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$", description="Engine preset (v4 or v4.1)"),
+    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
 ):
     """
     Returns OHLCV candlestick data, calculated technical indicators, and real-time confluence signals.
@@ -140,6 +147,8 @@ def get_market_data(
         rsi_overbought=rsi_overbought,
         asset_type=asset_type,
         engine_version=engine,
+        symbol=symbol,
+        is_elite_mode=elite_mode,
     )
 
     current_signal = signal_data["current"]
@@ -169,6 +178,7 @@ def get_market_data(
         "markers": markers,
         "engine_version": signal_data.get("engine_version", engine),
         "preset_label": signal_data.get("preset_label", engine),
+        "is_elite_mode": signal_data.get("is_elite_mode", elite_mode),
     }
 
 
@@ -189,6 +199,7 @@ def get_signal_at_time(
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
+    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
 ):
     """
     Evaluates indicators and returns signal details for a specific historical point in time.
@@ -220,6 +231,8 @@ def get_signal_at_time(
         rsi_overbought=rsi_overbought,
         asset_type=asset_type,
         preset=preset,
+        symbol=symbol,
+        is_elite_mode=elite_mode,
     )
 
     return {
@@ -228,6 +241,7 @@ def get_signal_at_time(
         "candle": candles[-1],
         "signal": sig_info,
         "engine_version": engine,
+        "is_elite_mode": elite_mode,
     }
 
 
@@ -250,6 +264,7 @@ def get_backtest(
     bb_period: int = Query(20, ge=2, le=200),
     bb_std: float = Query(2.0, gt=0.1, le=10.0),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
+    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
 ):
     """
     Executes historical backtest over live market data.
@@ -278,6 +293,8 @@ def get_backtest(
         rsi_overbought=rsi_overbought,
         asset_type=asset_type,
         engine_version=engine,
+        symbol=symbol,
+        is_elite_mode=elite_mode,
     )
 
     signals_history = signal_data.get("history", [])
@@ -337,15 +354,26 @@ SCANNER_WATCHLIST = [
 @app.get("/api/scanner/signals")
 def get_scanner_signals(
     interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
-    market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks"),
+    market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks, high_conf, elite_forex"),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
+    elite_mode: bool = Query(False, description="Filter to Elite 70% Whitelist and Grade A+ Setups (>=80% conf)"),
 ):
     """
     Live Multi-Chart Signal Scanner: Evaluates live signals across all market charts simultaneously.
+    Supports High-Conf Forex and Elite 70% Sniper Mode filtering.
     """
+    is_elite = elite_mode or (bool(market_filter) and market_filter.lower() in ("high_conf", "elite_forex"))
+    
     items_to_scan = SCANNER_WATCHLIST
-    if market_filter and market_filter.lower() != "all":
-        items_to_scan = [i for i in SCANNER_WATCHLIST if i["market"].lower() == market_filter.lower()]
+    if market_filter:
+        mf = market_filter.lower()
+        if mf in ("high_conf", "elite_forex"):
+            # High-Conf Forex: Whitelisted Forex pairs only
+            items_to_scan = [i for i in SCANNER_WATCHLIST if i["market"].lower() == "forex" and i["symbol"] in ELITE_70_SYMBOLS]
+        elif mf != "all":
+            items_to_scan = [i for i in SCANNER_WATCHLIST if i["market"].lower() == mf]
+    elif elite_mode:
+        items_to_scan = [i for i in SCANNER_WATCHLIST if i["symbol"] in ELITE_70_SYMBOLS]
 
     results = []
     for item in items_to_scan:
@@ -363,9 +391,15 @@ def get_scanner_signals(
                 rsi_overbought=72.0,
                 asset_type=detect_asset_type(sym),
                 engine_version=engine,
+                symbol=sym,
+                is_elite_mode=is_elite,
             )
             curr_sig = sig_data["current"]
+            conf = curr_sig.get("confidence", 0)
 
+            # In high_conf or elite mode, only show actionable signals with confidence >= 80% (Grade A+)
+            if is_elite and (curr_sig.get("signal") not in ("CALL", "PUT") or conf < 80):
+                continue
 
             price = candles[-1]["close"]
             digits = 5 if price < 5 else (3 if "JPY" in sym else 2)
@@ -377,8 +411,9 @@ def get_scanner_signals(
                 "tvSymbol": item["tvSymbol"],
                 "price": round(price, digits),
                 "signal": curr_sig.get("signal", "NEUTRAL"),
-                "confidence": curr_sig.get("confidence", 0),
+                "confidence": conf,
                 "score": curr_sig.get("score", 0),
+                "is_elite": curr_sig.get("is_elite", False) or conf >= 80,
                 "suggested_trade_time": curr_sig.get("suggested_trade_time", "5min"),
                 "suggested_trade_label": curr_sig.get("suggested_trade_label", "5 Min"),
                 "suggested_trade_seconds": curr_sig.get("suggested_trade_seconds", 300),
@@ -390,7 +425,13 @@ def get_scanner_signals(
 
     # Sort so high-confidence actionable setups appear first
     results.sort(key=lambda x: (x["signal"] in ("CALL", "PUT"), x["confidence"]), reverse=True)
-    return {"timestamp": int(time.time()), "interval": interval, "count": len(results), "signals": results}
+    return {
+        "timestamp": int(time.time()),
+        "interval": interval,
+        "count": len(results),
+        "signals": results,
+        "is_elite_mode": is_elite,
+    }
 
 
 @app.get("/api/optimize")

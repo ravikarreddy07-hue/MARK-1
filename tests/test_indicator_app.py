@@ -226,3 +226,28 @@ def test_engine_version_presets_and_api():
     assert res_inv.status_code == 422
 
 
+def test_elite_sniper_mode_and_scanner():
+    from app.services.signal_engine import ELITE_70_SYMBOLS
+
+    assert "USDCAD" in ELITE_70_SYMBOLS
+    assert "EURGBP" in ELITE_70_SYMBOLS
+    assert "EURUSD" in ELITE_70_SYMBOLS
+
+    # Test market-data endpoint with elite_mode=true
+    res = client.get("/api/market-data?symbol=EURUSD&interval=1m&elite_mode=true")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["is_elite_mode"] is True
+
+    # Test scanner endpoint with high_conf filter
+    res_scanner = client.get("/api/scanner/signals?interval=1m&market_filter=high_conf")
+    assert res_scanner.status_code == 200
+    scanner_data = res_scanner.json()
+    assert scanner_data["is_elite_mode"] is True
+    # All returned signals should have confidence >= 80 and be in Forex
+    for s in scanner_data["signals"]:
+        assert s["confidence"] >= 80
+        assert s["market"] == "Forex"
+
+
+

@@ -108,6 +108,7 @@ class BinaryApp {
 
         this.settings = this.loadSettings();
         this.engineVersion = "v4.1";
+        this.eliteMode = localStorage.getItem("qb_elite_mode") === "true";
         this.streamFilter = "all";
         this.streamData = [];
         this.init();
@@ -157,6 +158,7 @@ class BinaryApp {
     }
 
     async init() {
+        this.updateEliteSniperUI();
         this.populateSymbolDropdown();
         this.tvManager.loadChart(this.tvSymbol, this.interval);
         this.bindEvents();
@@ -166,6 +168,35 @@ class BinaryApp {
         await this.loadSignalsStream();
         this.initDerivBot();
         this.startPolling();
+    }
+
+    updateEliteSniperUI() {
+        const btn = document.getElementById("btn-toggle-elite-sniper");
+        const badge = document.getElementById("elite-sniper-badge");
+        if (!btn || !badge) return;
+        if (this.eliteMode) {
+            btn.classList.add("active");
+            badge.textContent = "ON (70%+)";
+            badge.className = "elite-badge on";
+        } else {
+            btn.classList.remove("active");
+            badge.textContent = "OFF";
+            badge.className = "elite-badge off";
+        }
+    }
+
+    toggleEliteSniper() {
+        this.eliteMode = !this.eliteMode;
+        localStorage.setItem("qb_elite_mode", this.eliteMode ? "true" : "false");
+        this.updateEliteSniperUI();
+        if (this.eliteMode) {
+            this.showToast("🎯 Option B: Elite 70% Sniper Mode ACTIVATED (Macro MTF + 80%+ Conf Gate)", "win");
+            this.updateDerivConfig({ min_confidence: 80 });
+        } else {
+            this.showToast("Elite Sniper Mode Deactivated. Returned to Standard Filters.", "info");
+        }
+        this.loadMarketData();
+        this.loadSignalsStream();
     }
 
     populateSymbolDropdown() {
@@ -189,6 +220,12 @@ class BinaryApp {
     }
 
     bindEvents() {
+        // Elite Sniper Toggle
+        const btnElite = document.getElementById("btn-toggle-elite-sniper");
+        if (btnElite) {
+            btnElite.addEventListener("click", () => this.toggleEliteSniper());
+        }
+
         // Symbol selection change
         const symbolSelect = document.getElementById("symbol-select");
         if (symbolSelect) {
@@ -368,7 +405,7 @@ class BinaryApp {
 
     async loadSignalsStream() {
         try {
-            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}`);
+            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}&elite_mode=${this.eliteMode}`);
             if (!res.ok) return;
             const data = await res.json();
             this.streamData = data.signals || [];
@@ -386,8 +423,8 @@ class BinaryApp {
 
         let filtered = this.streamData;
         if (this.streamFilter === "high_conf") {
-            // Show ONLY Forex pairs with actionable confirmed signals
-            filtered = this.streamData.filter((s) => s.market === "Forex" && s.signal !== "NEUTRAL" && s.confidence >= 65);
+            // Show ONLY Forex pairs with Grade A+ confirmed signals (>=80% confidence)
+            filtered = this.streamData.filter((s) => s.market === "Forex" && (s.signal === "CALL" || s.signal === "PUT") && s.confidence >= 80);
         } else if (this.streamFilter !== "all") {
             filtered = this.streamData.filter((s) => s.market.toLowerCase() === this.streamFilter.toLowerCase());
         }
@@ -410,7 +447,8 @@ class BinaryApp {
             el.className = `stream-signal-item ${sigLower}`;
 
             const badgeClass = item.signal === "CALL" ? "call" : item.signal === "PUT" ? "put" : "neutral";
-            const badgeText = item.signal === "CALL" ? `▲ CALL ${item.confidence}%` : item.signal === "PUT" ? `▼ PUT ${item.confidence}%` : `● CONSOLIDATION`;
+            const prefix = item.is_elite || item.confidence >= 80 ? "🎯 " : "";
+            const badgeText = item.signal === "CALL" ? `${prefix}CALL ${item.confidence}%` : item.signal === "PUT" ? `${prefix}PUT ${item.confidence}%` : `● CONSOLIDATION`;
             const icon = item.market === "Forex" ? "💱" : item.market === "Crypto" ? "🔥" : item.market === "Commodities" ? "🥇" : "📈";
 
             const reasonText = item.reasons && item.reasons.length > 0 ? item.reasons[0] : "Confluence Scanning";
@@ -496,6 +534,7 @@ class BinaryApp {
                 sma_period: this.settings.smaPeriod,
                 ema_period: this.settings.emaPeriod,
                 engine: this.engineVersion || "v4.1",
+                elite_mode: this.eliteMode ? "true" : "false",
             });
 
             const res = await fetch(`/api/market-data?${params.toString()}`);

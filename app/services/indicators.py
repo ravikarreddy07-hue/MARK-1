@@ -301,7 +301,9 @@ def compute_all_indicators(
     sma = calculate_sma(closes, period=sma_period)
     ema = calculate_ema(closes, period=ema_period)
     ema_21 = calculate_ema(closes, period=21)
+    ema_200 = calculate_ema(closes, period=min(200, max(20, len(closes) - 1)))
     bb_upper, bb_mid, bb_lower, bb_width, bb_pct_b = calculate_bollinger_bands(closes, period=bb_period, std_dev_multiplier=bb_std)
+
 
     # New: Stochastic RSI
     stoch_k, stoch_d = calculate_stoch_rsi(rsi, period=14, smooth_k=3, smooth_d=3)
@@ -360,7 +362,9 @@ def compute_all_indicators(
             "sma": to_raw(sma),
             "ema": to_raw(ema),
             "ema_21": to_raw(ema_21),
+            "ema_200": to_raw(ema_200),
             "bb_upper": to_raw(bb_upper),
+
             "bb_middle": to_raw(bb_mid),
             "bb_lower": to_raw(bb_lower),
             "bb_width": to_raw(bb_width),
