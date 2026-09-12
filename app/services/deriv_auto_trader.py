@@ -33,6 +33,12 @@ DERIV_SYMBOL_MAP = {
     "XRPUSDT": "cryXRPUSD",
     "DOGEUSDT": "cryDOGEUSD",
     
+    # Commodities / Metals
+    "GOLD": "frxXAUUSD",
+    "XAUUSD": "frxXAUUSD",
+    "SILVER": "frxXAGUSD",
+    "XAGUSD": "frxXAGUSD",
+    
     # Synthetic Volatility Indices
     "R_100": "R_100",
     "R_75": "R_75",
