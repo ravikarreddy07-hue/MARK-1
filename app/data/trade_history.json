@@ -1,11 +1,11 @@
 [
   {
-    "id": "bb6223f8",
+    "id": "bf53e36a",
     "symbol": "EURUSD",
     "timeframe": "1m",
     "signal": "CALL",
-    "entry_time": 1789152067,
-    "expiry_time": 1789152127,
+    "entry_time": 1789178695,
+    "expiry_time": 1789178755,
     "duration_seconds": 60,
     "entry_price": 1.085,
     "exit_price": null,
@@ -14,6 +14,38 @@
     "pnl": 0.0,
     "status": "ACTIVE",
     "outcome": "PENDING"
+  },
+  {
+    "id": "896d29de",
+    "symbol": "EURUSD",
+    "timeframe": "1m",
+    "signal": "CALL",
+    "entry_time": 1789154401,
+    "expiry_time": 1789154461,
+    "duration_seconds": 60,
+    "entry_price": 1.085,
+    "exit_price": 1.087,
+    "stake": 25.0,
+    "payout_rate": 0.85,
+    "pnl": 21.25,
+    "status": "CLOSED",
+    "outcome": "WIN"
+  },
+  {
+    "id": "bb6223f8",
+    "symbol": "EURUSD",
+    "timeframe": "1m",
+    "signal": "CALL",
+    "entry_time": 1789152067,
+    "expiry_time": 1789152127,
+    "duration_seconds": 60,
+    "entry_price": 1.085,
+    "exit_price": 1.087,
+    "stake": 25.0,
+    "payout_rate": 0.85,
+    "pnl": 21.25,
+    "status": "CLOSED",
+    "outcome": "WIN"
   },
   {
     "id": "0c07ff32",

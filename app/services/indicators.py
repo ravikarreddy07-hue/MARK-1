@@ -201,6 +201,77 @@ def calculate_atr(
     return atr
 
 
+def calculate_adx(
+    highs: np.ndarray,
+    lows: np.ndarray,
+    closes: np.ndarray,
+    period: int = 14,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Average Directional Index (ADX) with +DI and -DI.
+    ADX > 25 = strong trend (signals more reliable)
+    ADX < 20 = choppy/ranging (skip signals)
+    Returns: (adx, plus_di, minus_di)
+    """
+    n = len(closes)
+    adx    = np.full(n, np.nan)
+    pdi    = np.full(n, np.nan)
+    mdi    = np.full(n, np.nan)
+    if n < period * 2 + 1 or period <= 0:
+        return adx, pdi, mdi
+
+    tr_arr  = np.zeros(n)
+    pdm_arr = np.zeros(n)
+    mdm_arr = np.zeros(n)
+
+    tr_arr[0] = highs[0] - lows[0]
+    for i in range(1, n):
+        hl       = highs[i] - lows[i]
+        hpc      = abs(highs[i] - closes[i - 1])
+        lpc      = abs(lows[i]  - closes[i - 1])
+        tr_arr[i] = max(hl, hpc, lpc)
+        up   = highs[i] - highs[i - 1]
+        down = lows[i - 1] - lows[i]
+        if up > down and up > 0:
+            pdm_arr[i] = up
+        if down > up and down > 0:
+            mdm_arr[i] = down
+
+    # Wilder-smooth TR, +DM, -DM
+    smtr  = np.zeros(n)
+    smpdm = np.zeros(n)
+    smmdm = np.zeros(n)
+    smtr[period]  = tr_arr[1:period + 1].sum()
+    smpdm[period] = pdm_arr[1:period + 1].sum()
+    smmdm[period] = mdm_arr[1:period + 1].sum()
+    for i in range(period + 1, n):
+        smtr[i]  = smtr[i - 1]  - smtr[i - 1]  / period + tr_arr[i]
+        smpdm[i] = smpdm[i - 1] - smpdm[i - 1] / period + pdm_arr[i]
+        smmdm[i] = smmdm[i - 1] - smmdm[i - 1] / period + mdm_arr[i]
+        if smtr[i] > 0:
+            pdi[i] = 100.0 * smpdm[i] / smtr[i]
+            mdi[i] = 100.0 * smmdm[i] / smtr[i]
+
+    # DX → ADX (Wilder-smooth DX)
+    dx = np.full(n, np.nan)
+    for i in range(period, n):
+        if not np.isnan(pdi[i]) and not np.isnan(mdi[i]):
+            s = pdi[i] + mdi[i]
+            if s > 0:
+                dx[i] = 100.0 * abs(pdi[i] - mdi[i]) / s
+
+    adx_start = period * 2
+    valid_dx = dx[period:adx_start]
+    valid_dx = valid_dx[~np.isnan(valid_dx)]
+    if len(valid_dx) >= period and adx_start < n:
+        adx[adx_start] = np.mean(valid_dx[-period:])
+        for i in range(adx_start + 1, n):
+            if not np.isnan(dx[i]) and not np.isnan(adx[i - 1]):
+                adx[i] = (adx[i - 1] * (period - 1) + dx[i]) / period
+
+    return adx, pdi, mdi
+
+
 def compute_all_indicators(
     candles: List[Dict[str, Any]],
     rsi_period: int = 9,
@@ -241,6 +312,9 @@ def compute_all_indicators(
     # New: Volume SMA (to detect volume spikes)
     vol_sma = calculate_sma(volumes, period=20)
 
+    # New: ADX — trend strength filter
+    adx_arr, pdi_arr, mdi_arr = calculate_adx(highs, lows, closes, period=14)
+
     def fmt(arr: np.ndarray) -> List[Dict]:
         return [{"time": t, "value": round(float(v), 4)} for t, v in zip(times, arr) if not np.isnan(v)]
 
@@ -272,6 +346,7 @@ def compute_all_indicators(
             "d": fmt(stoch_d),
         },
         "atr": fmt(atr),
+        "adx": fmt(adx_arr),
         "raw": {
             "times": times,
             "closes": closes.tolist(),
@@ -294,5 +369,9 @@ def compute_all_indicators(
             "stoch_d": to_raw(stoch_d),
             "atr": to_raw(atr),
             "vol_sma": to_raw(vol_sma),
+            "adx": to_raw(adx_arr),
+            "plus_di": to_raw(pdi_arr),
+            "minus_di": to_raw(mdi_arr),
         }
     }
+

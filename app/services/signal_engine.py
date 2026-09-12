@@ -1,29 +1,70 @@
+import datetime
 import numpy as np
 from typing import List, Dict, Any, Optional
 
+# ─── Forex session windows (UTC hours) ────────────────────────────────────────
+LONDON_OPEN  = 8.0    # 08:00 UTC = 13:30 IST
+LONDON_CLOSE = 16.5   # 16:30 UTC = 22:00 IST
+NY_OPEN      = 13.0   # 13:00 UTC = 18:30 IST
+NY_CLOSE     = 21.0   # 21:00 UTC = 02:30 IST+1
+
+# ─── Asset type detection ─────────────────────────────────────────────────────
+CRYPTO_SUFFIXES  = ("USDT", "USDC", "BTC", "ETH", "BNB")
+SYNTH_KEYWORDS   = ("Volatility", "Boom", "Crash", "Jump", "Step", "Range")
+FOREX_KEYWORDS   = ("USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "INR")
+
+def detect_asset_type(symbol: str) -> str:
+    """Returns 'crypto', 'synthetic', or 'forex'"""
+    s = symbol.upper()
+    if any(s.endswith(sfx) for sfx in CRYPTO_SUFFIXES) or "USDT" in s:
+        return "crypto"
+    for kw in SYNTH_KEYWORDS:
+        if kw.lower() in symbol.lower():
+            return "synthetic"
+    return "forex"
+
+def is_active_session(timestamp_seconds: int, asset_type: str = "forex") -> bool:
+    """
+    Returns True if this candle falls in an active trading session.
+    Crypto & Synthetics trade 24/7 → always True.
+    Forex & Commodities → only during London or NY session.
+    """
+    if asset_type in ("crypto", "synthetic"):
+        return True
+    try:
+        dt   = datetime.datetime.fromtimestamp(timestamp_seconds, tz=datetime.timezone.utc)
+        hour = dt.hour + dt.minute / 60.0
+        in_london = LONDON_OPEN <= hour <= LONDON_CLOSE
+        in_ny     = NY_OPEN <= hour <= NY_CLOSE
+        return in_london or in_ny
+    except Exception:
+        return True  # fail open
+
 
 # ─── Hard-coded learned weights from grid-search backtesting ─────────────────
-# Derived from running grid search across 1,000 BTCUSDT + BNBUSDT + ETHUSDT
-# 1m candles.  Higher = more predictive for mean-reversion binary options.
-WEIGHT_RSI_EXTREME     = 4.0   # RSI <= 22 / >= 78 — extremely rare, very reliable
-WEIGHT_RSI_HOOK        = 3.0   # RSI reversal hook from oversold/overbought zone
-WEIGHT_STOCHRSI_CROSS  = 3.5   # StochRSI %K crosses %D while both in extreme zone
-WEIGHT_BB_PIERCE       = 3.0   # Price wicked outside Bollinger Band
-WEIGHT_BB_CLOSE_INSIDE = 1.5   # Candle close pulled back inside the band
-WEIGHT_WICK_STRENGTH   = 2.5   # Wick ratio >= 45% of candle range
-WEIGHT_ENGULF          = 2.0   # Engulfing / strong reversal candle body
-WEIGHT_MACD_CROSS      = 3.0   # MACD histogram crosses zero (momentum flip)
-WEIGHT_MACD_ALIGN      = 1.0   # MACD already on correct side (weaker)
-WEIGHT_ATR_FAVORABLE   = 1.5   # ATR confirms normal volatility (not in squeeze)
-WEIGHT_EMA_PULL        = 1.5   # Price pulled back to 21 EMA support/resistance
-WEIGHT_CONSECUTIVE_RUN = 1.5   # 3 candles all same direction into extreme
+WEIGHT_RSI_EXTREME     = 4.0
+WEIGHT_RSI_HOOK        = 3.0
+WEIGHT_STOCHRSI_CROSS  = 3.5
+WEIGHT_BB_PIERCE       = 3.0
+WEIGHT_BB_CLOSE_INSIDE = 1.5
+WEIGHT_WICK_STRENGTH   = 2.5
+WEIGHT_ENGULF          = 2.0
+WEIGHT_MACD_CROSS      = 3.0
+WEIGHT_MACD_ALIGN      = 1.0
+WEIGHT_ATR_FAVORABLE   = 1.5
+WEIGHT_EMA_PULL        = 1.5
+WEIGHT_CONSECUTIVE_RUN = 1.5
 
-# Minimum weighted score to generate a signal (very strict gate)
-MIN_BULL_SCORE = 8.0
-MIN_BEAR_SCORE = 8.0
+# Stricter minimum weighted score (raised from 8.0 → 10.0)
+MIN_BULL_SCORE = 10.0
+MIN_BEAR_SCORE = 10.0
 
-# Minimum lead the winning side must have over the losing side
-MIN_LEAD = 3.0
+# Stricter lead requirement (raised from 3.0 → 4.0)
+MIN_LEAD = 4.0
+
+# ADX threshold — skip signals when market is choppy
+ADX_MIN_TREND = 20.0
+
 
 
 def evaluate_candle_signal(
@@ -33,22 +74,23 @@ def evaluate_candle_signal(
     rsi_oversold: float = 28.0,
     rsi_overbought: float = 72.0,
     min_confidence: float = 60.0,
+    asset_type: str = "forex",
 ) -> Dict[str, Any]:
     """
-    V3 Precision Signal Engine.
+    V4 Precision Signal Engine — 5 active accuracy boosters:
 
-    5-pillar confluence gate (ALL must be met to issue a signal):
+    1. Session Filter     — Forex only fires during London/NY sessions
+    2. ADX Trend Filter   — Skips signals when ADX < 20 (choppy market)
+    3. Stricter scoring   — MIN_SCORE raised 8→10, MIN_LEAD raised 3→4
+    4. All 5 pillars req. — Previously 4/5 pillars, now requires 5/5
+    5. Confidence boost   — Base raised 65→70%, more reward for strong setups
+
+    Original 5 pillars (ALL must fire):
       1. RSI / StochRSI Exhaustion
       2. Bollinger Band Envelope Touch or Pierce
       3. Price-action candle rejection wick
       4. MACD histogram momentum alignment
       5. Trend / EMA pull-back alignment
-
-    Additionally:
-      - ATR volatility filter: skips signals during extremely low or extreme
-        high volatility (BB squeeze & volatile breakout environments)
-      - Volume spike filter: skips signals where volume is abnormally low
-        (illiquid bars are unreliable for reversal detection)
     """
     if idx < 4 or idx >= len(candles):
         return {
@@ -71,7 +113,12 @@ def evaluate_candle_signal(
     low_p   = c["low"]
     t       = c["time"]
 
+    # ── UPGRADE 1: Session filter ─────────────────────────────────────────────
+    if not is_active_session(t, asset_type):
+        return _neutral(t, close_p, "Outside trading session (London/NY only for Forex)")
+
     # ── Extract indicator arrays ──────────────────────────────────────────────
+
     rsi       = raw_ind.get("rsi",        [])
     stoch_k   = raw_ind.get("stoch_k",   [])
     stoch_d   = raw_ind.get("stoch_d",   [])
@@ -86,6 +133,7 @@ def evaluate_candle_signal(
     atr_arr   = raw_ind.get("atr",        [])
     vol_arr   = raw_ind.get("volumes",    [])
     vol_sma   = raw_ind.get("vol_sma",    [])
+    adx_arr   = raw_ind.get("adx",        [])
 
     def _get(arr, i, default=None):
         try:
@@ -115,21 +163,27 @@ def evaluate_candle_signal(
     curr_atr    = _get(atr_arr, idx)
     curr_vol    = _get(vol_arr, idx, 0.0)
     avg_vol     = _get(vol_sma, idx)
+    curr_adx    = _get(adx_arr, idx)
 
     # ── Pre-flight checks ─────────────────────────────────────────────────────
+
+    # UPGRADE 2: ADX filter — skip if market is choppy/ranging
+    if curr_adx is not None and curr_adx < ADX_MIN_TREND:
+        return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {ADX_MIN_TREND} — market ranging, skip")
 
     # Skip candles with no meaningful volatility (ATR < 0.05% of price)
     if curr_atr is not None and curr_atr > 0:
         atr_pct = curr_atr / close_p
-        if atr_pct < 0.0003:           # too quiet (squeeze) — unreliable
+        if atr_pct < 0.0003:
             return _neutral(t, close_p, "ATR squeeze: no volatility")
-        if atr_pct > 0.035:            # too wild (news spike) — unreliable
+        if atr_pct > 0.035:
             return _neutral(t, close_p, "ATR spike: extreme volatility event")
 
     # Skip abnormally low-volume candles (< 30% of average)
     if avg_vol is not None and avg_vol > 0 and curr_vol is not None:
         if curr_vol < avg_vol * 0.30:
             return _neutral(t, close_p, "Volume too low: illiquid bar")
+
 
     # ── Candle geometry ───────────────────────────────────────────────────────
     candle_range = max(high_p - low_p, close_p * 0.00001)
@@ -354,11 +408,12 @@ def evaluate_candle_signal(
                  + WEIGHT_MACD_CROSS + WEIGHT_ATR_FAVORABLE + WEIGHT_EMA_PULL
                  + WEIGHT_CONSECUTIVE_RUN)
 
-
-    if (bull_pillars >= 4
+    # UPGRADE 4: Require ALL 5 pillars (was >=4) — stricter confluence gate
+    # UPGRADE 5: Confidence base raised 65→70% — only top setups hit >=85%
+    if (bull_pillars >= 5
             and bull_score >= MIN_BULL_SCORE
             and bull_score >= bear_score + MIN_LEAD):
-        confidence = min(96.0, round(65.0 + (bull_score / max_score) * 31.0, 1))
+        confidence = min(96.0, round(70.0 + (bull_score / max_score) * 26.0, 1))
         return {
             "signal": "CALL",
             "confidence": confidence,
@@ -371,10 +426,10 @@ def evaluate_candle_signal(
             "suggested_trade_label": suggested_label,
         }
 
-    if (bear_pillars >= 4
+    if (bear_pillars >= 5
             and bear_score >= MIN_BEAR_SCORE
             and bear_score >= bull_score + MIN_LEAD):
-        confidence = min(96.0, round(65.0 + (bear_score / max_score) * 31.0, 1))
+        confidence = min(96.0, round(70.0 + (bear_score / max_score) * 26.0, 1))
         return {
             "signal": "PUT",
             "confidence": confidence,
@@ -388,6 +443,7 @@ def evaluate_candle_signal(
         }
 
     return _neutral(t, close_p, "Confluence threshold not met", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+
 
 
 def _neutral(t, price, reason="Consolidation / Mixed indicators", suggested_time="5min", suggested_secs=300, suggested_label="5 Min (Auto-Optimal)") -> Dict[str, Any]:
@@ -409,16 +465,18 @@ def generate_all_signals(
     indicator_data: Dict[str, Any],
     rsi_oversold: float = 28.0,
     rsi_overbought: float = 72.0,
+    asset_type: str = "forex",
 ) -> Dict[str, Any]:
     """
-    Generates precision signals across all candles using the V3 engine.
+    Generates precision signals across all candles using the V4 engine.
+    Includes 2-candle confirmation: a signal only stands if the previous
+    candle also fired the same direction — eliminates single-candle false spikes.
     """
     if not candles or not indicator_data or "raw" not in indicator_data:
         return {"current": None, "markers": [], "history": []}
 
     raw = indicator_data["raw"]
-    markers = []
-    history = []
+    raw_history = []
 
     for i in range(len(candles)):
         sig = evaluate_candle_signal(
@@ -427,9 +485,30 @@ def generate_all_signals(
             raw_ind=raw,
             rsi_oversold=rsi_oversold,
             rsi_overbought=rsi_overbought,
+            asset_type=asset_type,
         )
+        raw_history.append(sig)
+
+    # UPGRADE 3: 2-candle confirmation — signal only valid if prev candle agreed
+    history = []
+    for i, sig in enumerate(raw_history):
+        if sig["signal"] in ("CALL", "PUT") and i > 0:
+            prev = raw_history[i - 1]
+            if prev["signal"] != sig["signal"]:
+                # Previous candle disagreed — neutralise this signal
+                confirmed = _neutral(
+                    sig["time"], sig["entry_price"],
+                    f"No 2-candle confirmation (prev={prev['signal']})",
+                    suggested_time=sig.get("suggested_trade_time", "5min"),
+                    suggested_secs=sig.get("suggested_trade_seconds", 300),
+                    suggested_label=sig.get("suggested_trade_label", "5 Min"),
+                )
+                history.append(confirmed)
+                continue
         history.append(sig)
 
+    markers = []
+    for sig in history:
         if sig["signal"] == "CALL":
             markers.append({
                 "time": sig["time"],
@@ -449,14 +528,13 @@ def generate_all_signals(
                 "id": f"put_{sig['time']}",
             })
 
-    # Determine primary actionable signal (Prioritize Confirmed Closed Candle over flickering forming bar)
+    # Determine primary actionable signal
     current_signal = None
     if len(history) >= 2:
         last_closed_sig = history[-2]
-        forming_sig = history[-1]
+        forming_sig     = history[-1]
 
-        # If the last closed candle confirmed a CALL or PUT, latch it as the primary confirmed signal
-        if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= 60.0:
+        if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= 75.0:
             current_signal = dict(last_closed_sig)
             current_signal["status"] = "CONFIRMED"
             current_signal["status_label"] = "🟢 Confirmed Setup (Closed Candle)"
@@ -464,8 +542,8 @@ def generate_all_signals(
         elif forming_sig.get("signal") in ("CALL", "PUT"):
             current_signal = dict(forming_sig)
             current_signal["status"] = "FORMING"
-            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= 75 else "🟡 Forming (Wait for Candle Close)"
-            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= 75
+            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= 85 else "🟡 Forming (Wait for Candle Close)"
+            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= 85
         else:
             current_signal = dict(forming_sig)
             current_signal["status"] = "NEUTRAL"
@@ -473,5 +551,7 @@ def generate_all_signals(
             current_signal["is_confirmed"] = False
     elif history:
         current_signal = history[-1]
+
+    return {"current": current_signal, "markers": markers, "history": history}
 
     return {"current": current_signal, "markers": markers, "history": history}

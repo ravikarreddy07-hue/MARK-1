@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.services.data_fetcher import fetch_ohlcv, fetch_ohlcv_with_source, INTERVAL_SECONDS
 from app.services.indicators import compute_all_indicators
-from app.services.signal_engine import generate_all_signals, evaluate_candle_signal
+from app.services.signal_engine import generate_all_signals, evaluate_candle_signal, detect_asset_type
 from app.services.backtester import run_backtest
 from app.services.optimizer import optimize_strategy
 from app.services.trade_manager import trade_manager
@@ -131,11 +131,13 @@ def get_market_data(
     )
 
     # 2. Evaluate Signals
+    asset_type = detect_asset_type(symbol)
     signal_data = generate_all_signals(
         candles,
         indicators,
         rsi_oversold=rsi_oversold,
         rsi_overbought=rsi_overbought,
+        asset_type=asset_type,
     )
 
     current_signal = signal_data["current"]
