@@ -107,10 +107,11 @@ class BinaryApp {
         this.activeTrade = null;
 
         this.settings = this.loadSettings();
-        this.engineVersion = localStorage.getItem("qb_engine_version") || "v4.1";
+        this.engineVersion = "v4.1";
         this.streamFilter = "all";
         this.streamData = [];
         this.init();
+
     }
 
 
@@ -255,27 +256,8 @@ class BinaryApp {
             });
         });
 
-        // Engine Preset Toggle (V4.1 Balanced vs V4 Ultra)
-        document.querySelectorAll(".btn-engine").forEach((btn) => {
-            if (btn.dataset.engine === this.engineVersion) {
-                btn.classList.add("active");
-            } else {
-                btn.classList.remove("active");
-            }
-            btn.addEventListener("click", (e) => {
-                document.querySelectorAll(".btn-engine").forEach((b) => b.classList.remove("active"));
-                e.currentTarget.classList.add("active");
-                this.engineVersion = e.currentTarget.dataset.engine;
-                localStorage.setItem("qb_engine_version", this.engineVersion);
-                const modeLabel = this.engineVersion === "v4" ? "V4 Ultra (Sniper / Strictest)" : "V4.1 Balanced (Active Signals)";
-                this.showToast(`Switched to Signal Engine: ${modeLabel}`, "win");
-                this.loadMarketData();
-                this.loadSignalsStream();
-            });
-        });
-
-
         // Trade execution buttons
+
         const btnCall = document.getElementById("btn-execute-call");
         const btnPut = document.getElementById("btn-execute-put");
         if (btnCall) btnCall.addEventListener("click", () => this.executeTrade("CALL"));
@@ -564,14 +546,14 @@ class BinaryApp {
 
         const modelBadge = document.getElementById("signal-model-badge");
         if (modelBadge) {
-            const engineTag = this.engineVersion === "v4" ? "V4 ULTRA" : "V4.1 BALANCED";
             if (signal.status_label) {
-                modelBadge.textContent = `${engineTag} • ${signal.status_label}`;
+                modelBadge.textContent = signal.status_label;
                 modelBadge.style.color = signal.status === "CONFIRMED" ? "var(--call-color)" : (signal.status === "FORMING" ? "#ffca28" : "var(--accent-blue)");
             } else {
-                modelBadge.textContent = `${engineTag} AI CONFLUENCE`;
+                modelBadge.textContent = "V4.1 AI CONFLUENCE";
             }
         }
+
 
 
         if (banner) {

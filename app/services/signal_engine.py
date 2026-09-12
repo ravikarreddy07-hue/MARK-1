@@ -87,11 +87,11 @@ WEIGHT_ATR_FAVORABLE   = 1.5
 WEIGHT_EMA_PULL        = 1.5
 WEIGHT_CONSECUTIVE_RUN = 1.5
 
-# Default active preset (global fallback — overridden per-request)
-MIN_BULL_SCORE = 10.0
-MIN_BEAR_SCORE = 10.0
-MIN_LEAD       =  4.0
-ADX_MIN_TREND  = 20.0
+# Default active preset (global fallback — V4.1 Balanced)
+MIN_BULL_SCORE = 9.0
+MIN_BEAR_SCORE = 9.0
+MIN_LEAD       = 3.5
+ADX_MIN_TREND  = 15.0
 
 
 
@@ -109,20 +109,21 @@ def evaluate_candle_signal(
     preset: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
-    V4 Precision Signal Engine — engine behaviour is controlled by preset dict.
-    Pass ENGINE_PRESETS["v4"] or ENGINE_PRESETS["v4.1"] as preset.
+    V4.1 Precision Signal Engine — balanced multi-pillar confluence engine.
     """
     # Resolve preset settings
     if preset is None:
-        preset = ENGINE_PRESETS["v4"]
+        preset = ENGINE_PRESETS.get("v4.1", {})
     p_min_bull      = preset.get("min_bull_score",    MIN_BULL_SCORE)
     p_min_bear      = preset.get("min_bear_score",    MIN_BEAR_SCORE)
     p_min_lead      = preset.get("min_lead",          MIN_LEAD)
+
     p_adx_min       = preset.get("adx_min",           ADX_MIN_TREND)
-    p_pillars       = preset.get("pillars_required",  5)
+    p_pillars       = preset.get("pillars_required",  4)
     p_session       = preset.get("session_filter",    True)
-    p_conf_base     = preset.get("confidence_base",   70.0)
-    p_conf_range    = preset.get("confidence_range",  26.0)
+    p_conf_base     = preset.get("confidence_base",   68.0)
+    p_conf_range    = preset.get("confidence_range",  28.0)
+
 
 
     if idx < 4 or idx >= len(candles):
