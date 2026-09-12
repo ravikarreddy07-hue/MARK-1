@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quantum Binary - TradingView Terminal & High-Precision Signal Engine</title>
-    <link rel="stylesheet" href="/static/css/styles.css?v=10.0">
+    <link rel="stylesheet" href="/static/css/styles.css?v=11.0">
     <!-- Official TradingView Advanced Real-Time Charting Library -->
     <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
 </head>
@@ -51,7 +51,17 @@
                     <span class="badge-sub">Auto-Optimal</span>
                 </div>
             </div>
+
+            <!-- Signal Engine Mode (V4.1 Balanced vs V4 Ultra) -->
+            <div class="control-group">
+                <span class="control-label">Engine</span>
+                <div class="btn-pill-group" id="engine-preset-group">
+                    <button class="btn-pill btn-engine active" data-engine="v4.1" title="V4.1 Balanced: 4/5 pillars, ADX≥15, Session & 2-Candle filters. Regular high-quality signals.">V4.1 Balanced</button>
+                    <button class="btn-pill btn-engine" data-engine="v4" title="V4 Ultra: 5/5 pillars, ADX≥20, Score 10+, Session & 2-Candle filters. Rare sniper setups.">V4 Ultra</button>
+                </div>
+            </div>
         </div>
+
 
         <!-- Right Header Actions -->
         <div class="header-actions">
@@ -550,7 +560,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Application JavaScript Bundles -->
-    <script src="/static/js/chart.js?v=10.0"></script>
-    <script src="/static/js/app.js?v=10.0"></script>
+    <script src="/static/js/chart.js?v=11.0"></script>
+    <script src="/static/js/app.js?v=11.0"></script>
 </body>
 </html>

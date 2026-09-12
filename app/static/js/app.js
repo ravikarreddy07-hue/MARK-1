@@ -107,10 +107,12 @@ class BinaryApp {
         this.activeTrade = null;
 
         this.settings = this.loadSettings();
+        this.engineVersion = localStorage.getItem("qb_engine_version") || "v4.1";
         this.streamFilter = "all";
         this.streamData = [];
         this.init();
     }
+
 
     lookupTvSymbol(sym) {
         for (const cat of ASSET_CATALOG) {
@@ -253,6 +255,26 @@ class BinaryApp {
             });
         });
 
+        // Engine Preset Toggle (V4.1 Balanced vs V4 Ultra)
+        document.querySelectorAll(".btn-engine").forEach((btn) => {
+            if (btn.dataset.engine === this.engineVersion) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
+            btn.addEventListener("click", (e) => {
+                document.querySelectorAll(".btn-engine").forEach((b) => b.classList.remove("active"));
+                e.currentTarget.classList.add("active");
+                this.engineVersion = e.currentTarget.dataset.engine;
+                localStorage.setItem("qb_engine_version", this.engineVersion);
+                const modeLabel = this.engineVersion === "v4" ? "V4 Ultra (Sniper / Strictest)" : "V4.1 Balanced (Active Signals)";
+                this.showToast(`Switched to Signal Engine: ${modeLabel}`, "win");
+                this.loadMarketData();
+                this.loadSignalsStream();
+            });
+        });
+
+
         // Trade execution buttons
         const btnCall = document.getElementById("btn-execute-call");
         const btnPut = document.getElementById("btn-execute-put");
@@ -364,7 +386,7 @@ class BinaryApp {
 
     async loadSignalsStream() {
         try {
-            const res = await fetch(`/api/scanner/signals?interval=${this.interval}`);
+            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}`);
             if (!res.ok) return;
             const data = await res.json();
             this.streamData = data.signals || [];
@@ -373,6 +395,7 @@ class BinaryApp {
             console.error("Signals stream fetch error:", e);
         }
     }
+
 
     renderSignalsStream() {
         const grid = document.getElementById("signals-stream-grid");
@@ -490,6 +513,7 @@ class BinaryApp {
                 bb_std: this.settings.bbStd,
                 sma_period: this.settings.smaPeriod,
                 ema_period: this.settings.emaPeriod,
+                engine: this.engineVersion || "v4.1",
             });
 
             const res = await fetch(`/api/market-data?${params.toString()}`);
@@ -540,13 +564,15 @@ class BinaryApp {
 
         const modelBadge = document.getElementById("signal-model-badge");
         if (modelBadge) {
+            const engineTag = this.engineVersion === "v4" ? "V4 ULTRA" : "V4.1 BALANCED";
             if (signal.status_label) {
-                modelBadge.textContent = signal.status_label;
+                modelBadge.textContent = `${engineTag} • ${signal.status_label}`;
                 modelBadge.style.color = signal.status === "CONFIRMED" ? "var(--call-color)" : (signal.status === "FORMING" ? "#ffca28" : "var(--accent-blue)");
             } else {
-                modelBadge.textContent = "V3 AI CONFLUENCE";
+                modelBadge.textContent = `${engineTag} AI CONFLUENCE`;
             }
         }
+
 
         if (banner) {
             banner.className = `signal-banner ${type.toLowerCase()}`;
@@ -804,8 +830,9 @@ class BinaryApp {
         const expiry = document.getElementById("bt-expiry-select")?.value || "5min";
 
         try {
-            const res = await fetch(`/api/backtest?symbol=${this.symbol}&timeframe=${this.interval}&expiry_duration=${expiry}&limit=${limit}&payout_rate=${this.settings.payoutRate}&stake=${this.settings.stake}`);
+            const res = await fetch(`/api/backtest?symbol=${this.symbol}&timeframe=${this.interval}&expiry_duration=${expiry}&limit=${limit}&payout_rate=${this.settings.payoutRate}&stake=${this.settings.stake}&engine=${this.engineVersion || 'v4.1'}`);
             const data = await res.json();
+
 
             document.getElementById("bt-res-winrate").textContent = `${data.win_rate}%`;
             document.getElementById("bt-res-trades").textContent = `${data.total_trades} (W:${data.wins} / L:${data.losses})`;

@@ -41,6 +41,38 @@ def is_active_session(timestamp_seconds: int, asset_type: str = "forex") -> bool
         return True  # fail open
 
 
+# ─── Engine presets — selectable from the UI ─────────────────────────────────
+ENGINE_PRESETS = {
+    "v4": {
+        # Ultra-strict: all 5 pillars, high score gate, ADX≥20, session filter, 2-candle confirm
+        # Very few signals, highest quality only
+        "min_bull_score":    10.0,
+        "min_bear_score":    10.0,
+        "min_lead":           4.0,
+        "adx_min":           20.0,
+        "pillars_required":     5,
+        "two_candle_confirm": True,
+        "session_filter":     True,
+        "confidence_base":    70.0,
+        "confidence_range":   26.0,
+        "label": "V4 Ultra (Rare / Highest Accuracy)",
+    },
+    "v4.1": {
+        # Balanced: 4/5 pillars, moderate score gate, ADX≥15, session filter, 2-candle confirm
+        # More signals while still much stricter than V3
+        "min_bull_score":     9.0,
+        "min_bear_score":     9.0,
+        "min_lead":           3.5,
+        "adx_min":           15.0,
+        "pillars_required":     4,
+        "two_candle_confirm": True,
+        "session_filter":     True,
+        "confidence_base":    68.0,
+        "confidence_range":   28.0,
+        "label": "V4.1 Balanced (More Signals / Still Filtered)",
+    },
+}
+
 # ─── Hard-coded learned weights from grid-search backtesting ─────────────────
 WEIGHT_RSI_EXTREME     = 4.0
 WEIGHT_RSI_HOOK        = 3.0
@@ -55,15 +87,14 @@ WEIGHT_ATR_FAVORABLE   = 1.5
 WEIGHT_EMA_PULL        = 1.5
 WEIGHT_CONSECUTIVE_RUN = 1.5
 
-# Stricter minimum weighted score (raised from 8.0 → 10.0)
+# Default active preset (global fallback — overridden per-request)
 MIN_BULL_SCORE = 10.0
 MIN_BEAR_SCORE = 10.0
+MIN_LEAD       =  4.0
+ADX_MIN_TREND  = 20.0
 
-# Stricter lead requirement (raised from 3.0 → 4.0)
-MIN_LEAD = 4.0
 
-# ADX threshold — skip signals when market is choppy
-ADX_MIN_TREND = 20.0
+
 
 
 
@@ -75,23 +106,25 @@ def evaluate_candle_signal(
     rsi_overbought: float = 72.0,
     min_confidence: float = 60.0,
     asset_type: str = "forex",
+    preset: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
-    V4 Precision Signal Engine — 5 active accuracy boosters:
-
-    1. Session Filter     — Forex only fires during London/NY sessions
-    2. ADX Trend Filter   — Skips signals when ADX < 20 (choppy market)
-    3. Stricter scoring   — MIN_SCORE raised 8→10, MIN_LEAD raised 3→4
-    4. All 5 pillars req. — Previously 4/5 pillars, now requires 5/5
-    5. Confidence boost   — Base raised 65→70%, more reward for strong setups
-
-    Original 5 pillars (ALL must fire):
-      1. RSI / StochRSI Exhaustion
-      2. Bollinger Band Envelope Touch or Pierce
-      3. Price-action candle rejection wick
-      4. MACD histogram momentum alignment
-      5. Trend / EMA pull-back alignment
+    V4 Precision Signal Engine — engine behaviour is controlled by preset dict.
+    Pass ENGINE_PRESETS["v4"] or ENGINE_PRESETS["v4.1"] as preset.
     """
+    # Resolve preset settings
+    if preset is None:
+        preset = ENGINE_PRESETS["v4"]
+    p_min_bull      = preset.get("min_bull_score",    MIN_BULL_SCORE)
+    p_min_bear      = preset.get("min_bear_score",    MIN_BEAR_SCORE)
+    p_min_lead      = preset.get("min_lead",          MIN_LEAD)
+    p_adx_min       = preset.get("adx_min",           ADX_MIN_TREND)
+    p_pillars       = preset.get("pillars_required",  5)
+    p_session       = preset.get("session_filter",    True)
+    p_conf_base     = preset.get("confidence_base",   70.0)
+    p_conf_range    = preset.get("confidence_range",  26.0)
+
+
     if idx < 4 or idx >= len(candles):
         return {
             "signal": "NEUTRAL",
@@ -113,9 +146,10 @@ def evaluate_candle_signal(
     low_p   = c["low"]
     t       = c["time"]
 
-    # ── UPGRADE 1: Session filter ─────────────────────────────────────────────
-    if not is_active_session(t, asset_type):
+    # ── UPGRADE 1: Session filter (controlled by preset) ──────────────────────
+    if p_session and not is_active_session(t, asset_type):
         return _neutral(t, close_p, "Outside trading session (London/NY only for Forex)")
+
 
     # ── Extract indicator arrays ──────────────────────────────────────────────
 
@@ -168,8 +202,9 @@ def evaluate_candle_signal(
     # ── Pre-flight checks ─────────────────────────────────────────────────────
 
     # UPGRADE 2: ADX filter — skip if market is choppy/ranging
-    if curr_adx is not None and curr_adx < ADX_MIN_TREND:
-        return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {ADX_MIN_TREND} — market ranging, skip")
+    if curr_adx is not None and curr_adx < p_adx_min:
+        return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {p_adx_min} — market ranging, skip")
+
 
     # Skip candles with no meaningful volatility (ATR < 0.05% of price)
     if curr_atr is not None and curr_atr > 0:
@@ -408,12 +443,11 @@ def evaluate_candle_signal(
                  + WEIGHT_MACD_CROSS + WEIGHT_ATR_FAVORABLE + WEIGHT_EMA_PULL
                  + WEIGHT_CONSECUTIVE_RUN)
 
-    # UPGRADE 4: Require ALL 5 pillars (was >=4) — stricter confluence gate
-    # UPGRADE 5: Confidence base raised 65→70% — only top setups hit >=85%
-    if (bull_pillars >= 5
-            and bull_score >= MIN_BULL_SCORE
-            and bull_score >= bear_score + MIN_LEAD):
-        confidence = min(96.0, round(70.0 + (bull_score / max_score) * 26.0, 1))
+    # Gate checking against preset thresholds (V4 vs V4.1)
+    if (bull_pillars >= p_pillars
+            and bull_score >= p_min_bull
+            and bull_score >= bear_score + p_min_lead):
+        confidence = min(96.0, round(p_conf_base + (bull_score / max_score) * p_conf_range, 1))
         return {
             "signal": "CALL",
             "confidence": confidence,
@@ -426,10 +460,10 @@ def evaluate_candle_signal(
             "suggested_trade_label": suggested_label,
         }
 
-    if (bear_pillars >= 5
-            and bear_score >= MIN_BEAR_SCORE
-            and bear_score >= bull_score + MIN_LEAD):
-        confidence = min(96.0, round(70.0 + (bear_score / max_score) * 26.0, 1))
+    if (bear_pillars >= p_pillars
+            and bear_score >= p_min_bear
+            and bear_score >= bull_score + p_min_lead):
+        confidence = min(96.0, round(p_conf_base + (bear_score / max_score) * p_conf_range, 1))
         return {
             "signal": "PUT",
             "confidence": confidence,
@@ -466,14 +500,19 @@ def generate_all_signals(
     rsi_oversold: float = 28.0,
     rsi_overbought: float = 72.0,
     asset_type: str = "forex",
+    engine_version: str = "v4.1",
+    preset: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Generates precision signals across all candles using the V4 engine.
-    Includes 2-candle confirmation: a signal only stands if the previous
-    candle also fired the same direction — eliminates single-candle false spikes.
+    Generates precision signals across all candles using selectable engine presets:
+    - 'v4': Ultra-strict (5/5 pillars, 10.0 score, ADX>=20)
+    - 'v4.1': Balanced (4/5 pillars, 9.0 score, ADX>=15)
     """
     if not candles or not indicator_data or "raw" not in indicator_data:
-        return {"current": None, "markers": [], "history": []}
+        return {"current": None, "markers": [], "history": [], "engine_version": engine_version}
+
+    if preset is None:
+        preset = ENGINE_PRESETS.get(str(engine_version).lower(), ENGINE_PRESETS["v4.1"])
 
     raw = indicator_data["raw"]
     raw_history = []
@@ -486,16 +525,17 @@ def generate_all_signals(
             rsi_oversold=rsi_oversold,
             rsi_overbought=rsi_overbought,
             asset_type=asset_type,
+            preset=preset,
         )
         raw_history.append(sig)
 
-    # UPGRADE 3: 2-candle confirmation — signal only valid if prev candle agreed
+    # 2-candle confirmation if enabled in preset
     history = []
+    use_two_candle = preset.get("two_candle_confirm", True)
     for i, sig in enumerate(raw_history):
-        if sig["signal"] in ("CALL", "PUT") and i > 0:
+        if use_two_candle and sig["signal"] in ("CALL", "PUT") and i > 0:
             prev = raw_history[i - 1]
             if prev["signal"] != sig["signal"]:
-                # Previous candle disagreed — neutralise this signal
                 confirmed = _neutral(
                     sig["time"], sig["entry_price"],
                     f"No 2-candle confirmation (prev={prev['signal']})",
@@ -530,11 +570,14 @@ def generate_all_signals(
 
     # Determine primary actionable signal
     current_signal = None
+    min_confirm_conf = 70.0 if engine_version == "v4.1" else 75.0
+    spike_conf = 80.0 if engine_version == "v4.1" else 85.0
+
     if len(history) >= 2:
         last_closed_sig = history[-2]
         forming_sig     = history[-1]
 
-        if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= 75.0:
+        if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= min_confirm_conf:
             current_signal = dict(last_closed_sig)
             current_signal["status"] = "CONFIRMED"
             current_signal["status_label"] = "🟢 Confirmed Setup (Closed Candle)"
@@ -542,8 +585,8 @@ def generate_all_signals(
         elif forming_sig.get("signal") in ("CALL", "PUT"):
             current_signal = dict(forming_sig)
             current_signal["status"] = "FORMING"
-            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= 85 else "🟡 Forming (Wait for Candle Close)"
-            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= 85
+            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= spike_conf else "🟡 Forming (Wait for Candle Close)"
+            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= spike_conf
         else:
             current_signal = dict(forming_sig)
             current_signal["status"] = "NEUTRAL"
@@ -552,6 +595,11 @@ def generate_all_signals(
     elif history:
         current_signal = history[-1]
 
-    return {"current": current_signal, "markers": markers, "history": history}
+    return {
+        "current": current_signal,
+        "markers": markers,
+        "history": history,
+        "engine_version": engine_version,
+        "preset_label": preset.get("label", engine_version),
+    }
 
-    return {"current": current_signal, "markers": markers, "history": history}

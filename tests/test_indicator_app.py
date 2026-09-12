@@ -187,3 +187,42 @@ def test_deriv_auto_trader_module():
     assert res_cfg.status_code == 200
     assert res_cfg.json()["config"]["default_stake"] == 15.0
 
+
+def test_engine_version_presets_and_api():
+    from app.services.signal_engine import ENGINE_PRESETS, generate_all_signals
+    from app.services.indicators import compute_all_indicators
+    from app.services.data_fetcher import generate_synthetic_data
+
+    assert "v4" in ENGINE_PRESETS
+    assert "v4.1" in ENGINE_PRESETS
+    assert ENGINE_PRESETS["v4"]["pillars_required"] == 5
+    assert ENGINE_PRESETS["v4.1"]["pillars_required"] == 4
+    assert ENGINE_PRESETS["v4"]["adx_min"] == 20.0
+    assert ENGINE_PRESETS["v4.1"]["adx_min"] == 15.0
+
+    candles = generate_synthetic_data(symbol="EURUSD", interval="1m", limit=100)
+    ind = compute_all_indicators(candles)
+
+
+    # Test v4
+    sig_v4 = generate_all_signals(candles, ind, asset_type="forex", engine_version="v4")
+    assert sig_v4["engine_version"] == "v4"
+
+    # Test v4.1
+    sig_v41 = generate_all_signals(candles, ind, asset_type="forex", engine_version="v4.1")
+    assert sig_v41["engine_version"] == "v4.1"
+
+    # Test API endpoint supports both
+    res_v4 = client.get("/api/market-data?symbol=EURUSD&interval=1m&engine=v4")
+    assert res_v4.status_code == 200
+    assert res_v4.json()["engine_version"] == "v4"
+
+    res_v41 = client.get("/api/market-data?symbol=EURUSD&interval=1m&engine=v4.1")
+    assert res_v41.status_code == 200
+    assert res_v41.json()["engine_version"] == "v4.1"
+
+    # Test invalid engine returns 422
+    res_inv = client.get("/api/market-data?symbol=EURUSD&interval=1m&engine=invalid")
+    assert res_inv.status_code == 422
+
+

@@ -170,6 +170,27 @@ select.custom-select:focus, input.custom-input:focus {
   box-shadow: 0 0 10px rgba(41, 121, 255, 0.4);
 }
 
+.btn-engine {
+  font-size: 11px;
+  padding: 4px 8px;
+  letter-spacing: 0.2px;
+}
+
+.btn-engine[data-engine="v4.1"].active {
+  background: linear-gradient(135deg, #00b0ff, #00e5ff);
+  color: #0b101d;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.45);
+}
+
+.btn-engine[data-engine="v4"].active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0b101d;
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.45);
+}
+
+
 .header-actions {
   display: flex;
   align-items: center;
