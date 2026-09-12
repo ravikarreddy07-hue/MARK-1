@@ -212,6 +212,7 @@ def evaluate_candle_signal(
     curr_bbw    = _get(bb_w, idx)
     curr_ema    = _get(ema, idx)
     curr_ema21  = _get(ema_21, idx)
+    curr_ema200 = _get(ema_200, idx)
     curr_atr    = _get(atr_arr, idx)
     curr_vol    = _get(vol_arr, idx, 0.0)
     avg_vol     = _get(vol_sma, idx)
@@ -224,12 +225,12 @@ def evaluate_candle_signal(
         return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {p_adx_min} — market ranging, skip")
 
 
-    # Skip candles with no meaningful volatility (ATR < 0.05% of price)
+    # Skip candles with no meaningful volatility (ATR < 0.001% of price = completely flat)
     if curr_atr is not None and curr_atr > 0:
         atr_pct = curr_atr / close_p
-        if atr_pct < 0.0003:
-            return _neutral(t, close_p, "ATR squeeze: no volatility")
-        if atr_pct > 0.035:
+        if atr_pct < 0.00001:
+            return _neutral(t, close_p, "ATR squeeze: flat market")
+        if atr_pct > 0.05:
             return _neutral(t, close_p, "ATR spike: extreme volatility event")
 
     # Skip abnormally low-volume candles (< 30% of average)
@@ -419,7 +420,7 @@ def evaluate_candle_signal(
     # ── ATR bonus: normal volatility = more reliable signal ──────────────────
     if curr_atr is not None and curr_atr > 0:
         atr_pct = curr_atr / close_p
-        if 0.002 <= atr_pct <= 0.015:
+        if 0.00003 <= atr_pct <= 0.03:
             bull_score += WEIGHT_ATR_FAVORABLE * 0.5
             bear_score += WEIGHT_ATR_FAVORABLE * 0.5
 
