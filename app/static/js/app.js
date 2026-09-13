@@ -1068,10 +1068,10 @@ class BinaryApp {
                 this.updateDerivConfig({
                     default_stake: parseFloat(stakeInput?.value || 1.0),
                     min_confidence: parseInt(confInput?.value || 80),
-                    take_profit_daily: parseFloat(tpInput?.value || 10.0),
-                    stop_loss_daily: parseFloat(slInput?.value || 2.0),
-                    max_daily_trades: parseInt(maxTradesInput?.value || 10),
-                    max_daily_losses: parseInt(maxLossesInput?.value || 2),
+                    take_profit_daily: parseFloat(tpInput?.value || 10000.0),
+                    stop_loss_daily: parseFloat(slInput?.value || 10000.0),
+                    max_daily_trades: parseInt(maxTradesInput?.value || 10000),
+                    max_daily_losses: parseInt(maxLossesInput?.value || 10000),
                 });
             });
         });

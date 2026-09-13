@@ -102,10 +102,10 @@ class DerivAutoTrader:
             "min_confidence": 80,
             "preferred_duration": 5,
             "duration_unit": "m",
-            "take_profit_daily": 10.0,
-            "stop_loss_daily": 2.0,
-            "max_daily_trades": 10,       # Take N number of trades per day
-            "max_daily_losses": 2,        # Stop if we get 2 losses
+            "take_profit_daily": 10000.0,
+            "stop_loss_daily": 10000.0,
+            "max_daily_trades": 10000,       # Take N number of trades per day
+            "max_daily_losses": 10000,       # Stop if we get N losses
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
         }
