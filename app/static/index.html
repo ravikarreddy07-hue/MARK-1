@@ -201,6 +201,14 @@
                                     <input type="number" id="deriv-conf-input" class="custom-input" value="80" min="60" max="95" step="5">
                                 </div>
                                 <div class="input-wrap">
+                                    <label>Max Trades/Day (N)</label>
+                                    <input type="number" id="deriv-max-trades-input" class="custom-input" value="10" min="1" max="100" step="1" title="Take N number of trades per day">
+                                </div>
+                                <div class="input-wrap">
+                                    <label>Stop on Losses</label>
+                                    <input type="number" id="deriv-max-losses-input" class="custom-input" value="2" min="1" max="10" step="1" title="Stop automatically after N losses">
+                                </div>
+                                <div class="input-wrap">
                                     <label>Take Profit ($)</label>
                                     <input type="number" id="deriv-tp-input" class="custom-input" value="10" min="1" step="1">
                                 </div>
@@ -219,6 +227,43 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Live Trade Execution & Settlement History Table -->
+            <div class="trade-history-card" style="margin-top: 14px; background: #131826; border: 1px solid var(--border-color); border-radius: 10px; padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-size: 13px; font-weight: 800; color: #fff; letter-spacing: 0.5px;">📋 LIVE TRADE EXECUTION &amp; SETTLEMENT HISTORY</span>
+                        <span id="win-rate-pill" class="badge-tag" style="background: rgba(0, 230, 118, 0.15); color: var(--call-color); font-weight: 700; font-size: 11px;">Win Rate: --%</span>
+                        <span style="font-size: 11px; color: var(--text-secondary);">Net PnL: <strong id="net-pnl-display" style="color: var(--call-color); font-size: 12px;">+$0.00</strong></span>
+                    </div>
+                    <button id="btn-clear-trades" class="btn-ghost" style="font-size: 10px; padding: 3px 8px;">Clear History</button>
+                </div>
+
+                <div style="max-height: 220px; overflow-y: auto; overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <table class="trade-table" style="width: 100%; border-collapse: collapse; font-size: 11px; text-align: left;">
+                        <thead style="background: #0b0f19; position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--border-color);">
+                            <tr>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Time</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Asset</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">TF</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Signal</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Duration</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Stake</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Exit</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">Outcome</th>
+                                <th style="padding: 8px 10px; color: var(--text-secondary);">PnL ($)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-history-tbody">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                                    No trades executed yet today. Live trades from Deriv and manual execution will appear here.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>

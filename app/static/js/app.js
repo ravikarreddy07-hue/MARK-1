@@ -400,6 +400,7 @@ class BinaryApp {
         this.pollInterval = setInterval(() => {
             this.loadMarketData(false);
             this.loadSignalsStream();
+            this.loadTradeHistory();
         }, 4500);
     }
 
@@ -1037,13 +1038,18 @@ class BinaryApp {
             }
         });
 
-        [stakeInput, confInput, tpInput, slInput].forEach((inp) => {
+        const maxTradesInput = document.getElementById("deriv-max-trades-input");
+        const maxLossesInput = document.getElementById("deriv-max-losses-input");
+
+        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
                 this.updateDerivConfig({
                     default_stake: parseFloat(stakeInput?.value || 1.0),
                     min_confidence: parseInt(confInput?.value || 80),
                     take_profit_daily: parseFloat(tpInput?.value || 10.0),
                     stop_loss_daily: parseFloat(slInput?.value || 2.0),
+                    max_daily_trades: parseInt(maxTradesInput?.value || 10),
+                    max_daily_losses: parseInt(maxLossesInput?.value || 2),
                 });
             });
         });
@@ -1177,8 +1183,14 @@ class BinaryApp {
                 pnlEl.style.color = pnl >= 0 ? "var(--call-color)" : "var(--put-color)";
             }
             if (winrateEl) {
-                winrateEl.textContent = `${data.stats?.win_rate || 0}% (${data.stats?.won_trades || 0}/${data.stats?.total_trades || 0})`;
+                const maxTrades = data.config?.max_daily_trades || 10;
+                const maxLosses = data.config?.max_daily_losses || 2;
+                winrateEl.textContent = `${data.stats?.win_rate || 0}% (${data.stats?.won_trades || 0}W / ${data.stats?.lost_trades || 0}L)`;
+                winrateEl.title = `Trades: ${data.stats?.total_trades || 0}/${maxTrades} | Losses: ${data.stats?.lost_trades || 0}/${maxLosses}`;
             }
+
+            // Also refresh live trade table
+            this.loadTradeHistory();
 
             // Render live activity feed
             if (logEl && data.recent_activity && data.recent_activity.length > 0) {

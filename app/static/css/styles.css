@@ -1499,4 +1499,47 @@ input:checked + .slider:before {
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.8);
 }
 
+/* 📋 Live Trade History Table */
+.trade-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.trade-table th, .trade-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trade-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.trade-table td.win {
+  color: #00e676;
+  font-weight: 700;
+}
+
+.trade-table td.loss {
+  color: #ff3d57;
+  font-weight: 700;
+}
+
+.badge-sig.win {
+  background: rgba(0, 230, 118, 0.15);
+  color: #00e676;
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.badge-sig.loss {
+  background: rgba(255, 61, 87, 0.15);
+  color: #ff3d57;
+  border: 1px solid rgba(255, 61, 87, 0.3);
+}
+
+.badge-sig.tie {
+  background: rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+}
+
 

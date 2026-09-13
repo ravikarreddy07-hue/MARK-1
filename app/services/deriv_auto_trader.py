@@ -84,6 +84,8 @@ class DerivAutoTrader:
             "duration_unit": "m",
             "take_profit_daily": 10.0,
             "stop_loss_daily": 2.0,
+            "max_daily_trades": 10,       # Take N number of trades per day
+            "max_daily_losses": 2,        # Stop if we get 2 losses
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
         }
@@ -93,6 +95,7 @@ class DerivAutoTrader:
         self.total_trades_count: int = 0
         self.won_trades_count: int = 0
         self.lost_trades_count: int = 0
+        self.consecutive_losses_count: int = 0
         self.active_contracts: Dict[str, Any] = {}
         self.trade_cooldowns: Dict[str, float] = {}
         self.activity_log: List[Dict[str, Any]] = []
@@ -407,6 +410,9 @@ class DerivAutoTrader:
         except Exception:
             pass
         
+        # Extract spot price from proposal if available
+        spot_price = proposal_res.get("proposal", {}).get("spot", 0.0)
+
         # Record into active tracking
         trade_record = {
             "contract_id": contract_id,
@@ -415,12 +421,32 @@ class DerivAutoTrader:
             "signal": contract_type,
             "stake": buy_price,
             "payout": payout,
+            "spot": spot_price,
             "duration": f"{trade_duration}{trade_unit}",
             "confidence": confidence or 0,
             "reasons": reasons or [],
             "start_time": int(time.time()),
             "status": "OPEN",
         }
+
+        # Register in TradeManager for live UI history table
+        try:
+            from app.services.trade_manager import trade_manager
+            duration_sec = trade_duration * (60 if trade_unit == "m" else (1 if trade_unit == "s" else (3600 if trade_unit == "h" else 2)))
+            rate = round((payout - buy_price) / buy_price, 2) if buy_price > 0 else 0.85
+            t_obj = trade_manager.create_trade(
+                symbol=symbol,
+                signal=contract_type,
+                entry_price=float(spot_price) if spot_price else 1.0,
+                expiry_duration_seconds=duration_sec,
+                stake=buy_price,
+                payout_rate=rate,
+                timeframe=f"{trade_duration}{trade_unit}",
+            )
+            trade_record["tm_id"] = t_obj["id"]
+        except Exception:
+            pass
+
         self.active_contracts[str(contract_id)] = trade_record
         self.total_trades_count += 1
         self.trade_cooldowns[symbol] = time.time()
@@ -463,9 +489,23 @@ class DerivAutoTrader:
             self.is_auto_trading_enabled = False
             return None
             
-        # Risk Check: Daily Stop Loss (2 losses @ $1 stake = $2.00)
+        # Risk Check: Max Losses Limit (Stop if we get 2 losses)
+        max_losses = int(self.config.get("max_daily_losses", 2))
+        if self.lost_trades_count >= max_losses:
+            self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses} losses). Auto-trading stopped for protection.", "warning")
+            self.is_auto_trading_enabled = False
+            return None
+
+        # Risk Check: Daily Stop Loss Dollar Limit ($2.00)
         if self.daily_pnl <= -float(self.config.get("stop_loss_daily", 2.0)):
             self.log_activity(f"🛑 Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f}) reached. Auto-trading stopped to protect capital.", "warning")
+            self.is_auto_trading_enabled = False
+            return None
+
+        # Risk Check: N Trades Per Day Quota
+        max_trades = int(self.config.get("max_daily_trades", 10))
+        if max_trades > 0 and self.total_trades_count >= max_trades:
+            self.log_activity(f"🎯 Daily trade quota reached ({self.total_trades_count}/{max_trades} trades). Auto-trading completed for today.", "info")
             self.is_auto_trading_enabled = False
             return None
             
@@ -601,13 +641,39 @@ class DerivAutoTrader:
                 trade["profit"] = profit
                 trade["status"] = "WON" if profit > 0 else "LOST"
                 
+                # Update status in TradeManager
+                try:
+                    from app.services.trade_manager import trade_manager
+                    tm_id = trade.get("tm_id")
+                    if tm_id:
+                        trade_manager.update_trade_outcome(
+                            trade_id=tm_id,
+                            outcome="WIN" if profit > 0 else "LOSS",
+                        )
+                except Exception:
+                    pass
+
                 self.daily_pnl += profit
                 if profit > 0:
                     self.won_trades_count += 1
+                    self.consecutive_losses_count = 0
                     self.log_activity(f"🏆 CONTRACT WON! #{contract_id} on {trade['symbol']} | Profit: +${profit:.2f}", "success", trade)
                 else:
                     self.lost_trades_count += 1
+                    self.consecutive_losses_count += 1
                     self.log_activity(f"❌ CONTRACT LOST: #{contract_id} on {trade['symbol']} | Loss: -${abs(profit):.2f}", "warning", trade)
+                    
+                    # Immediate shutdown if 2 losses reached
+                    max_losses = int(self.config.get("max_daily_losses", 2))
+                    if self.lost_trades_count >= max_losses:
+                        self.is_auto_trading_enabled = False
+                        self.log_activity(f"🛑 2 LOSSES REACHED ({self.lost_trades_count}/{max_losses})! Auto-trading STOPPED immediately to protect your capital.", "warning")
+
+                # Check if daily trade quota reached
+                max_trades = int(self.config.get("max_daily_trades", 10))
+                if max_trades > 0 and self.total_trades_count >= max_trades:
+                    self.is_auto_trading_enabled = False
+                    self.log_activity(f"🎯 Daily trade quota reached ({self.total_trades_count}/{max_trades} trades). Auto-trading finished for today.", "info")
 
 
 # Singleton instance
