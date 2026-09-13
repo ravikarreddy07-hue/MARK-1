@@ -1039,11 +1039,16 @@ class BinaryApp {
             this.disconnectDeriv();
         });
 
-        autoSwitch?.addEventListener("change", (e) => {
+        autoSwitch?.addEventListener("change", async (e) => {
             const enabled = e.target.checked;
             this.updateDerivConfig({ is_auto_trading_enabled: enabled });
             if (enabled) {
-                this.showToast("⚡ Deriv Auto-Trading is now ACTIVE! Bot will execute confirmed signals.", "win");
+                // Automatically refresh trade table for fresh session
+                try {
+                    await fetch("/api/trades", { method: "DELETE" });
+                    await this.loadTradeHistory();
+                } catch (err) {}
+                this.showToast("⚡ Deriv Auto-Trading ACTIVE! Trade history refreshed for new session.", "win");
             } else {
                 this.showToast("⏸️ Deriv Auto-Trading PAUSED.", "info");
             }

@@ -350,9 +350,24 @@ class DerivAutoTrader:
             if k in self.config:
                 self.config[k] = v
         if "is_auto_trading_enabled" in new_config:
+            was_enabled = self.is_auto_trading_enabled
             self.is_auto_trading_enabled = bool(new_config["is_auto_trading_enabled"])
             status_str = "ACTIVE ⚡ (Cloud 24/7)" if self.is_auto_trading_enabled else "PAUSED ⏸️"
             self.log_activity(f"Auto-Trading switched to: {status_str}", "info")
+
+            # Automatically refresh/clear trade history and session stats when starting auto bot
+            if self.is_auto_trading_enabled and not was_enabled:
+                try:
+                    from app.services.trade_manager import trade_manager
+                    trade_manager.clear_history()
+                    self.daily_pnl = 0.0
+                    self.total_trades_count = 0
+                    self.won_trades_count = 0
+                    self.lost_trades_count = 0
+                    self.consecutive_losses_count = 0
+                    self.log_activity("🧹 Trade history refreshed for new auto-trading session.", "info")
+                except Exception as clear_err:
+                    logger.error(f"Error resetting trade history: {clear_err}")
 
         # Persist config and auto-trading state to file
         try:
