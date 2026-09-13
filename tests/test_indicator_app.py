@@ -250,4 +250,17 @@ def test_elite_sniper_mode_and_scanner():
         assert s["market"] == "Forex"
 
 
+def test_health_and_ping_endpoints():
+    res = client.get("/ping")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "healthy"
+    assert "bot_connected" in data
+
+    res2 = client.get("/api/health")
+    assert res2.status_code == 200
+    assert res2.json()["status"] == "healthy"
+
+
+
 

@@ -6,6 +6,9 @@ import time
 from typing import Dict, Any, Optional, List, Callable
 import requests
 import websockets
+from app.services.data_fetcher import fetch_ohlcv_with_source
+from app.services.indicators import compute_all_indicators
+from app.services.signal_engine import generate_all_signals, detect_asset_type
 
 logger = logging.getLogger("deriv_auto_trader")
 
@@ -57,6 +60,17 @@ DERIV_SYMBOL_MAP = {
     "1HZ25V": "1HZ25V",
     "1HZ10V": "1HZ10V",
 }
+
+# Watchlist for 24/7 Autonomous Cloud Scanner
+AUTONOMOUS_WATCHLIST = [
+    # Cryptocurrencies (24/7/365 active)
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT",
+    # Forex Majors & Crosses (active when forex market is open)
+    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
+    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "GBPAUD",
+    # Commodities
+    "GOLD", "SILVER",
+]
 
 
 class DerivAutoTrader:
@@ -337,8 +351,22 @@ class DerivAutoTrader:
                 self.config[k] = v
         if "is_auto_trading_enabled" in new_config:
             self.is_auto_trading_enabled = bool(new_config["is_auto_trading_enabled"])
-            status_str = "ACTIVE ⚡" if self.is_auto_trading_enabled else "PAUSED ⏸️"
+            status_str = "ACTIVE ⚡ (Cloud 24/7)" if self.is_auto_trading_enabled else "PAUSED ⏸️"
             self.log_activity(f"Auto-Trading switched to: {status_str}", "info")
+
+        # Persist config and auto-trading state to file
+        try:
+            os.makedirs(os.path.dirname(CREDENTIALS_FILE), exist_ok=True)
+            existing = {}
+            if os.path.exists(CREDENTIALS_FILE):
+                with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            existing["is_auto_trading_enabled"] = self.is_auto_trading_enabled
+            existing["config"] = self.config
+            with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+                json.dump(existing, f)
+        except Exception:
+            pass
             
         return {
             "success": True,
@@ -571,6 +599,7 @@ class DerivAutoTrader:
         """Auto-connects to Deriv on server launch using saved credentials or default token."""
         token = None
         app_id = DEFAULT_DERIV_APP_ID
+        auto_trade = False
         
         try:
             if os.path.exists(CREDENTIALS_FILE):
@@ -578,6 +607,9 @@ class DerivAutoTrader:
                     data = json.load(f)
                     token = data.get("token")
                     app_id = data.get("app_id", DEFAULT_DERIV_APP_ID)
+                    auto_trade = bool(data.get("is_auto_trading_enabled", False))
+                    if "config" in data and isinstance(data["config"], dict):
+                        self.config.update(data["config"])
         except Exception:
             pass
             
@@ -589,8 +621,55 @@ class DerivAutoTrader:
             try:
                 res = await self.connect(token=token, app_id=app_id)
                 logger.info(f"Startup Deriv Auto-Connect result: {res.get('success')}")
+                if res.get("success") and auto_trade:
+                    self.is_auto_trading_enabled = True
+                    self.log_activity("Restored Auto-Trading state: ACTIVE ⚡ (Cloud 24/7 Mode)", "info")
             except Exception as e:
                 logger.error(f"Startup Deriv Auto-Connect failed: {e}")
+
+    async def run_autonomous_scanner(self):
+        """
+        Autonomous Cloud Trading Engine:
+        Continuously scans market assets and executes Grade A+ trades 24/7 on the cloud
+        server even if the user's browser is closed or computer is turned off.
+        """
+        logger.info("Autonomous Cloud Trading Engine initialized.")
+        # Brief warmup delay after server startup
+        await asyncio.sleep(6)
+        
+        while True:
+            try:
+                if self.is_auto_trading_enabled and self.is_connected and self.is_authorized:
+                    for sym in AUTONOMOUS_WATCHLIST:
+                        if not self.is_auto_trading_enabled:
+                            break
+                        try:
+                            candles, _ = fetch_ohlcv_with_source(symbol=sym, interval="1m", limit=100)
+                            if not candles or len(candles) < 30:
+                                continue
+                            ind = compute_all_indicators(
+                                candles, rsi_period=9, macd_fast=12, macd_slow=26, macd_signal=9, bb_period=20, bb_std=2.0
+                            )
+                            sig_data = generate_all_signals(
+                                candles,
+                                ind,
+                                rsi_oversold=28.0,
+                                rsi_overbought=72.0,
+                                asset_type=detect_asset_type(sym),
+                                engine_version="v4.1",
+                                symbol=sym,
+                                is_elite_mode=True,
+                            )
+                            curr_sig = sig_data.get("current", {})
+                            if curr_sig.get("signal") in ("CALL", "PUT"):
+                                await self.evaluate_auto_trade_signal(curr_sig, sym)
+                        except Exception as sym_err:
+                            logger.debug(f"Error scanning {sym}: {sym_err}")
+                        await asyncio.sleep(0.1)
+            except Exception as e:
+                logger.error(f"Error in autonomous scanner loop: {e}")
+                
+            await asyncio.sleep(25)
 
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""

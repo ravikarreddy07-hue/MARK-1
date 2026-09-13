@@ -35,8 +35,24 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Auto-connects to Deriv on server startup if token is configured."""
+    """Auto-connects to Deriv on server startup and starts 24/7 autonomous cloud scanner."""
     asyncio.create_task(deriv_trader.auto_connect_on_startup())
+    asyncio.create_task(deriv_trader.run_autonomous_scanner())
+
+@app.get("/ping")
+@app.get("/api/health")
+def health_check():
+    """Lightweight keep-alive endpoint for UptimeRobot monitoring and cloud health status."""
+    return {
+        "status": "healthy",
+        "timestamp": int(time.time()),
+        "bot_connected": deriv_trader.is_connected,
+        "bot_authorized": deriv_trader.is_authorized,
+        "auto_trading": deriv_trader.is_auto_trading_enabled,
+        "account": deriv_trader.account_info.get("loginid"),
+        "balance": deriv_trader.account_info.get("balance"),
+        "active_contracts": len(deriv_trader.active_contracts),
+    }
 
 class TradeCreateRequest(BaseModel):
     symbol: str = Field("BTCUSDT", min_length=1, max_length=30)
