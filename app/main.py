@@ -108,10 +108,10 @@ class DerivConfigRequest(BaseModel):
     duration_unit: Optional[str] = Field(None, pattern="^(s|m|h|d)$")
     take_profit_daily: Optional[float] = Field(None, ge=0.0)
     stop_loss_daily: Optional[float] = Field(None, ge=0.0)
-    max_daily_trades: Optional[int] = Field(None, ge=1, le=1000)
-    max_daily_losses: Optional[int] = Field(None, ge=1, le=50)
-    max_concurrent_trades: Optional[int] = Field(None, ge=1, le=10)
-    cooldown_seconds: Optional[int] = Field(None, ge=10, le=600)
+    max_daily_trades: Optional[int] = Field(None, ge=1, le=50000)
+    max_daily_losses: Optional[int] = Field(None, ge=1, le=10000)
+    max_concurrent_trades: Optional[int] = Field(None, ge=1, le=20)
+    cooldown_seconds: Optional[int] = Field(None, ge=5, le=600)
     is_auto_trading_enabled: Optional[bool] = None
 
 class DerivManualTradeRequest(BaseModel):
