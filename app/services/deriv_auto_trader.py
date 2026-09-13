@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -125,9 +126,11 @@ class DerivAutoTrader:
         self._pending_requests: Dict[int, asyncio.Future] = {}
 
     def log_activity(self, message: str, level: str = "info", data: Optional[Dict[str, Any]] = None):
+        ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        ist_now = datetime.datetime.now(ist_tz)
         entry = {
             "timestamp": int(time.time()),
-            "time_str": time.strftime("%H:%M:%S", time.localtime()),
+            "time_str": ist_now.strftime("%H:%M:%S IST"),
             "message": message,
             "level": level,
             "data": data or {},

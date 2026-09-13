@@ -796,7 +796,13 @@ class BinaryApp {
 
             const tr = document.createElement("tr");
             const d = new Date(t.entry_time * 1000);
-            const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const timeStr = d.toLocaleTimeString('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: true
+            }) + ' IST';
 
             const outClass = t.outcome === "WIN" ? "win" : t.outcome === "LOSS" ? "loss" : "tie";
             const pnlClass = t.pnl > 0 ? "win" : t.pnl < 0 ? "loss" : "";

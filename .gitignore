@@ -39,3 +39,6 @@ cloudflared.exe
 .idea/
 .DS_Store
 Thumbs.db
+
+# Credentials & Local Data
+app/data/deriv_credentials.json
