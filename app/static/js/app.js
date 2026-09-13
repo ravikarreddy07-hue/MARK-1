@@ -1003,20 +1003,31 @@ class BinaryApp {
         const slInput = document.getElementById("deriv-sl-input");
         const appIdField = document.getElementById("deriv-appid-input");
 
-        // Restore saved app id & token
-        const savedAppId = localStorage.getItem("qb_deriv_appid") || "34nZu00szxPcV0FfERyJF";
+        const defaultToken = "pat_543859a4eafd961283e1449a6efdb8f1a94a407aaed712a0d513261698888f30";
+        const defaultAppId = "34nZu00szxPcV0FfERyJF";
+
+        // Restore saved app id & token, defaulting to active credentials
+        const savedAppId = localStorage.getItem("qb_deriv_appid") || defaultAppId;
         if (appIdField) appIdField.value = savedAppId;
 
-        const savedToken = localStorage.getItem("qb_deriv_token");
-        if (savedToken) {
-            const tokenField = document.getElementById("deriv-token-input");
-            if (tokenField) tokenField.value = savedToken;
-            this.connectDeriv(savedToken, savedAppId);
-        }
+        const tokenField = document.getElementById("deriv-token-input");
+        const savedToken = localStorage.getItem("qb_deriv_token") || defaultToken;
+        if (tokenField) tokenField.value = savedToken;
+
+        // 1. Immediately check live backend connection status
+        this.pollDerivStatus();
+
+        // 2. Auto-connect if server is not yet connected
+        setTimeout(() => {
+            const statusBadge = document.getElementById("deriv-conn-status");
+            if (statusBadge && statusBadge.textContent.includes("Disconnected") && savedToken) {
+                this.connectDeriv(savedToken, savedAppId);
+            }
+        }, 1000);
 
         btnConnect?.addEventListener("click", () => {
-            const token = document.getElementById("deriv-token-input")?.value?.trim();
-            const appId = document.getElementById("deriv-appid-input")?.value?.trim() || "34nZu00szxPcV0FfERyJF";
+            const token = document.getElementById("deriv-token-input")?.value?.trim() || savedToken;
+            const appId = document.getElementById("deriv-appid-input")?.value?.trim() || savedAppId;
             if (!token) {
                 this.showToast("Please enter your Deriv Token", "loss");
                 return;

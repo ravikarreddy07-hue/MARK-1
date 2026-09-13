@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Dict, Any, Optional, List, Callable
 import requests
@@ -11,6 +12,8 @@ logger = logging.getLogger("deriv_auto_trader")
 DERIV_WS_LEGACY_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
 DERIV_REST_BASE_URL = "https://api.derivws.com"
 DEFAULT_DERIV_APP_ID = "34nZu00szxPcV0FfERyJF"
+DEFAULT_DERIV_TOKEN = "pat_543859a4eafd961283e1449a6efdb8f1a94a407aaed712a0d513261698888f30"
+CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "deriv_credentials.json")
 
 # Symbol translation from terminal assets to Deriv contract asset IDs
 DERIV_SYMBOL_MAP = {
@@ -237,6 +240,14 @@ class DerivAutoTrader:
                     f"🟢 Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}",
                     "success"
                 )
+
+                # Persist credentials for automatic server reboot recovery
+                try:
+                    os.makedirs(os.path.dirname(CREDENTIALS_FILE), exist_ok=True)
+                    with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+                        json.dump({"token": clean_token, "app_id": clean_app_id}, f)
+                except Exception:
+                    pass
                 
                 return {
                     "success": True,
@@ -556,6 +567,31 @@ class DerivAutoTrader:
         """Public alias for evaluate_auto_trade_signal."""
         return await self.evaluate_auto_trade_signal(signal_data=signal_data, symbol=symbol)
 
+    async def auto_connect_on_startup(self):
+        """Auto-connects to Deriv on server launch using saved credentials or default token."""
+        token = None
+        app_id = DEFAULT_DERIV_APP_ID
+        
+        try:
+            if os.path.exists(CREDENTIALS_FILE):
+                with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    token = data.get("token")
+                    app_id = data.get("app_id", DEFAULT_DERIV_APP_ID)
+        except Exception:
+            pass
+            
+        if not token:
+            token = DEFAULT_DERIV_TOKEN
+            
+        if token:
+            logger.info(f"Auto-connecting to Deriv on server boot (App ID: {app_id})...")
+            try:
+                res = await self.connect(token=token, app_id=app_id)
+                logger.info(f"Startup Deriv Auto-Connect result: {res.get('success')}")
+            except Exception as e:
+                logger.error(f"Startup Deriv Auto-Connect failed: {e}")
+
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
         return {
@@ -625,7 +661,18 @@ class DerivAutoTrader:
                 break
             except Exception as e:
                 logger.error(f"WebSocket listener loop error: {e}")
-                await asyncio.sleep(1)
+                # Auto-reconnect if connection dropped unexpectedly
+                if self._running and self.api_token:
+                    self.is_connected = False
+                    self.is_authorized = False
+                    self.log_activity("WebSocket connection dropped. Reconnecting in 3s...", "warning")
+                    await asyncio.sleep(3)
+                    try:
+                        await self.connect(self.api_token, self.app_id)
+                    except Exception as re_err:
+                        logger.error(f"Auto-reconnect failed: {re_err}")
+                else:
+                    await asyncio.sleep(1)
 
     def _handle_open_contract_update(self, poc: Dict[str, Any]):
         """Processes real-time contract settlement (Win / Loss / Profit update)."""

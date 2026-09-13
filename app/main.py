@@ -33,6 +33,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Auto-connects to Deriv on server startup if token is configured."""
+    asyncio.create_task(deriv_trader.auto_connect_on_startup())
+
 class TradeCreateRequest(BaseModel):
     symbol: str = Field("BTCUSDT", min_length=1, max_length=30)
     signal: str = Field(..., pattern="^(CALL|PUT)$")
