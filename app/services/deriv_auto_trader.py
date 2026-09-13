@@ -626,7 +626,7 @@ class DerivAutoTrader:
         """Auto-connects to Deriv on server launch using saved credentials or default token."""
         token = None
         app_id = DEFAULT_DERIV_APP_ID
-        auto_trade = False
+        auto_trade = True
         
         try:
             if os.path.exists(CREDENTIALS_FILE):
@@ -634,7 +634,7 @@ class DerivAutoTrader:
                     data = json.load(f)
                     token = data.get("token")
                     app_id = data.get("app_id", DEFAULT_DERIV_APP_ID)
-                    auto_trade = bool(data.get("is_auto_trading_enabled", False))
+                    auto_trade = bool(data.get("is_auto_trading_enabled", True))
                     if "config" in data and isinstance(data["config"], dict):
                         self.config.update(data["config"])
         except Exception:
@@ -697,6 +697,31 @@ class DerivAutoTrader:
                 logger.error(f"Error in autonomous scanner loop: {e}")
                 
             await asyncio.sleep(25)
+
+    async def run_cloud_keepalive(self):
+        """
+        Autonomous Cloud Keepalive:
+        Pings the public /ping endpoint every 9 minutes to guarantee Render's
+        free-tier 15-minute inactivity idle timer never puts the server to sleep.
+        """
+        render_url = os.getenv("RENDER_EXTERNAL_URL", "https://quantum-binary-terminal.onrender.com").rstrip("/")
+        ping_endpoint = f"{render_url}/ping"
+        logger.info(f"Cloud keepalive worker initialized (target: {ping_endpoint})")
+        await asyncio.sleep(60)
+
+        while True:
+            try:
+                def _do_ping():
+                    return requests.get(ping_endpoint, timeout=10)
+
+                resp = await asyncio.to_thread(_do_ping)
+                if resp.status_code == 200:
+                    logger.debug("Cloud keepalive heartbeat sent successfully.")
+            except Exception as e:
+                logger.debug(f"Cloud keepalive heartbeat notice: {e}")
+
+            # Sleep 9 minutes (Render free tier spins down at 15 minutes of inactivity)
+            await asyncio.sleep(540)
 
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
