@@ -1200,6 +1200,23 @@ class BinaryApp {
                 winrateEl.title = `Trades: ${data.stats?.total_trades || 0}/${maxTrades} | Losses: ${data.stats?.lost_trades || 0}/${maxLosses}`;
             }
 
+            // Sync risk parameter inputs from server if user is not currently editing them
+            if (data.config) {
+                const stakeInp = document.getElementById("deriv-stake-input");
+                const confInp = document.getElementById("deriv-conf-input");
+                const tpInp = document.getElementById("deriv-tp-input");
+                const slInp = document.getElementById("deriv-sl-input");
+                const maxTInp = document.getElementById("deriv-max-trades-input");
+                const maxLInp = document.getElementById("deriv-max-losses-input");
+
+                if (stakeInp && document.activeElement !== stakeInp && data.config.default_stake !== undefined) stakeInp.value = data.config.default_stake;
+                if (confInp && document.activeElement !== confInp && data.config.min_confidence !== undefined) confInp.value = data.config.min_confidence;
+                if (tpInp && document.activeElement !== tpInp && data.config.take_profit_daily !== undefined) tpInp.value = data.config.take_profit_daily;
+                if (slInp && document.activeElement !== slInp && data.config.stop_loss_daily !== undefined) slInp.value = data.config.stop_loss_daily;
+                if (maxTInp && document.activeElement !== maxTInp && data.config.max_daily_trades !== undefined) maxTInp.value = data.config.max_daily_trades;
+                if (maxLInp && document.activeElement !== maxLInp && data.config.max_daily_losses !== undefined) maxLInp.value = data.config.max_daily_losses;
+            }
+
             // Also refresh live trade table
             this.loadTradeHistory();
 
