@@ -1000,22 +1000,27 @@ class BinaryApp {
         const confInput = document.getElementById("deriv-conf-input");
         const tpInput = document.getElementById("deriv-tp-input");
         const slInput = document.getElementById("deriv-sl-input");
+        const appIdField = document.getElementById("deriv-appid-input");
 
-        // Restore saved token
+        // Restore saved app id & token
+        const savedAppId = localStorage.getItem("qb_deriv_appid") || "34nZu00szxPcV0FfERyJF";
+        if (appIdField) appIdField.value = savedAppId;
+
         const savedToken = localStorage.getItem("qb_deriv_token");
         if (savedToken) {
             const tokenField = document.getElementById("deriv-token-input");
             if (tokenField) tokenField.value = savedToken;
-            this.connectDeriv(savedToken);
+            this.connectDeriv(savedToken, savedAppId);
         }
 
         btnConnect?.addEventListener("click", () => {
             const token = document.getElementById("deriv-token-input")?.value?.trim();
+            const appId = document.getElementById("deriv-appid-input")?.value?.trim() || "34nZu00szxPcV0FfERyJF";
             if (!token) {
-                this.showToast("Please enter your Deriv API Token", "loss");
+                this.showToast("Please enter your Deriv Token", "loss");
                 return;
             }
-            this.connectDeriv(token);
+            this.connectDeriv(token, appId);
         });
 
         btnDisconnect?.addEventListener("click", () => {
@@ -1035,10 +1040,10 @@ class BinaryApp {
         [stakeInput, confInput, tpInput, slInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
                 this.updateDerivConfig({
-                    default_stake: parseFloat(stakeInput?.value || 10),
-                    min_confidence: parseInt(confInput?.value || 75),
-                    take_profit_daily: parseFloat(tpInput?.value || 50),
-                    stop_loss_daily: parseFloat(slInput?.value || 25),
+                    default_stake: parseFloat(stakeInput?.value || 1.0),
+                    min_confidence: parseInt(confInput?.value || 80),
+                    take_profit_daily: parseFloat(tpInput?.value || 10.0),
+                    stop_loss_daily: parseFloat(slInput?.value || 2.0),
                 });
             });
         });
@@ -1047,7 +1052,7 @@ class BinaryApp {
         setInterval(() => this.pollDerivStatus(), 3500);
     }
 
-    async connectDeriv(token) {
+    async connectDeriv(token, appId = "34nZu00szxPcV0FfERyJF") {
         const btnConnect = document.getElementById("btn-deriv-connect");
         const errEl = document.getElementById("deriv-auth-error");
         if (errEl) errEl.style.display = "none";
@@ -1059,10 +1064,11 @@ class BinaryApp {
 
         try {
             const cleanToken = token.trim().replace(/['"\r\n\s]/g, "");
+            const cleanAppId = (appId || "34nZu00szxPcV0FfERyJF").trim().replace(/['"\r\n\s]/g, "");
             const res = await fetch("/api/deriv/connect", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: cleanToken }),
+                body: JSON.stringify({ token: cleanToken, app_id: cleanAppId }),
             });
             const data = await res.json();
 
@@ -1075,13 +1081,14 @@ class BinaryApp {
                 this.showToast(errMsg, "loss");
                 if (btnConnect) {
                     btnConnect.disabled = false;
-                    btnConnect.textContent = "Connect";
+                    btnConnect.textContent = "Connect Bot";
                 }
                 return;
             }
 
             if (errEl) errEl.style.display = "none";
             localStorage.setItem("qb_deriv_token", cleanToken);
+            localStorage.setItem("qb_deriv_appid", cleanAppId);
             this.showToast(`✅ Connected to Deriv (${data.account?.is_virtual ? "Demo" : "Real"}: ${data.account?.loginid})`, "win");
             this.pollDerivStatus();
         } catch (e) {
@@ -1095,7 +1102,7 @@ class BinaryApp {
         } finally {
             if (btnConnect) {
                 btnConnect.disabled = false;
-                btnConnect.textContent = "Connect";
+                btnConnect.textContent = "Connect Bot";
             }
         }
     }

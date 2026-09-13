@@ -78,6 +78,7 @@ class OptimizeRequest(BaseModel):
 
 class DerivConnectRequest(BaseModel):
     token: str = Field(..., min_length=5, max_length=150)
+    app_id: Optional[str] = Field(None, max_length=50)
 
 class DerivConfigRequest(BaseModel):
     default_stake: Optional[float] = Field(None, gt=0.0)
@@ -401,6 +402,22 @@ def get_scanner_signals(
             if is_elite and (curr_sig.get("signal") not in ("CALL", "PUT") or conf < 80):
                 continue
 
+            # Auto-execute trade on Deriv if enabled and signal meets confidence criteria
+            if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT"):
+                min_conf = float(deriv_trader.config.get("min_confidence", 80))
+                if conf >= min_conf:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            loop.create_task(
+                                deriv_trader.on_signal_received(
+                                    symbol=sym,
+                                    signal_data=curr_sig,
+                                )
+                            )
+                    except Exception:
+                        pass
+
             price = candles[-1]["close"]
             digits = 5 if price < 5 else (3 if "JPY" in sym else 2)
 
@@ -512,8 +529,8 @@ def clear_trades():
 
 @app.post("/api/deriv/connect")
 async def deriv_connect(req: DerivConnectRequest):
-    """Connects and authorizes with Deriv WebSocket API."""
-    res = await deriv_trader.connect(req.token)
+    """Connects and authorizes with Deriv API (supports 2026 Options REST/WS and Legacy API)."""
+    res = await deriv_trader.connect(token=req.token, app_id=req.app_id)
     if not res.get("success"):
         raise HTTPException(status_code=400, detail=res.get("error", "Connection failed"))
     return res

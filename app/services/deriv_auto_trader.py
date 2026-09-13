@@ -3,11 +3,14 @@ import json
 import logging
 import time
 from typing import Dict, Any, Optional, List, Callable
+import requests
 import websockets
 
 logger = logging.getLogger("deriv_auto_trader")
 
-DERIV_WS_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+DERIV_WS_LEGACY_URL = "wss://ws.derivws.com/websockets/v3?app_id=1089"
+DERIV_REST_BASE_URL = "https://api.derivws.com"
+DEFAULT_DERIV_APP_ID = "34nZu00szxPcV0FfERyJF"
 
 # Symbol translation from terminal assets to Deriv contract asset IDs
 DERIV_SYMBOL_MAP = {
@@ -56,6 +59,8 @@ DERIV_SYMBOL_MAP = {
 class DerivAutoTrader:
     def __init__(self):
         self.api_token: Optional[str] = None
+        self.app_id: str = DEFAULT_DERIV_APP_ID
+        self.is_pat_api: bool = False
         self.ws = None
         self.is_connected: bool = False
         self.is_authorized: bool = False
@@ -73,12 +78,12 @@ class DerivAutoTrader:
         
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
-            "default_stake": 10.0,
-            "min_confidence": 75,
+            "default_stake": 1.0,
+            "min_confidence": 80,
             "preferred_duration": 5,
             "duration_unit": "m",
-            "take_profit_daily": 50.0,
-            "stop_loss_daily": 25.0,
+            "take_profit_daily": 10.0,
+            "stop_loss_daily": 2.0,
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
         }
@@ -114,10 +119,66 @@ class DerivAutoTrader:
         clean = symbol.upper().replace("/", "").replace("-", "")
         return DERIV_SYMBOL_MAP.get(clean, clean)
 
-    async def connect(self, token: str) -> Dict[str, Any]:
-        """Connects and authorizes with Deriv WebSocket API."""
+    def _sync_get_accounts_and_otp(self, token: str, app_id: str):
+        """Synchronous helper for 2026 Options REST API calls."""
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Deriv-App-ID": app_id,
+            "Content-Type": "application/json",
+        }
+        
+        # 1. Fetch accounts
+        accts_url = f"{DERIV_REST_BASE_URL}/trading/v1/options/accounts"
+        resp = requests.get(accts_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            err_data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+            err_msg = err_data.get("message") or err_data.get("error", {}).get("message") or f"HTTP {resp.status_code}"
+            return {"success": False, "error": f"Failed to retrieve Deriv accounts: {err_msg}"}
+            
+        data = resp.json().get("data", [])
+        if not data:
+            return {"success": False, "error": "No trading accounts found for this Deriv token/App ID."}
+            
+        # Select active demo or real account
+        selected_acct = None
+        for a in data:
+            if a.get("status") == "active":
+                selected_acct = a
+                break
+        if not selected_acct:
+            selected_acct = data[0]
+            
+        account_id = selected_acct.get("account_id")
+        
+        # 2. Fetch WebSocket OTP URL
+        otp_url = f"{DERIV_REST_BASE_URL}/trading/v1/options/accounts/{account_id}/otp"
+        otp_resp = requests.post(otp_url, headers=headers, timeout=10)
+        if otp_resp.status_code != 200:
+            err_data = otp_resp.json() if otp_resp.headers.get("content-type", "").startswith("application/json") else {}
+            err_msg = err_data.get("message") or f"HTTP {otp_resp.status_code}"
+            return {"success": False, "error": f"Failed to generate WebSocket OTP: {err_msg}"}
+            
+        ws_url = otp_resp.json().get("data", {}).get("url")
+        if not ws_url:
+            return {"success": False, "error": "No WebSocket OTP URL returned by Deriv"}
+            
+        return {
+            "success": True,
+            "account": selected_acct,
+            "ws_url": ws_url,
+        }
+
+    async def connect(self, token: str, app_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Connects and authorizes with Deriv.
+        Supports both the new 2026 Options REST/WebSocket protocol (for Personal Access Tokens)
+        and legacy WebSocket tokens.
+        """
         clean_token = token.strip().replace('"', '').replace("'", "").replace("\n", "").replace("\r", "").replace(" ", "")
+        clean_app_id = (app_id or self.app_id or DEFAULT_DERIV_APP_ID).strip().replace('"', '').replace("'", "").replace(" ", "")
+        
         self.api_token = clean_token
+        self.app_id = clean_app_id
         self._running = True
         
         try:
@@ -127,54 +188,108 @@ class DerivAutoTrader:
                 except Exception:
                     pass
             
-            self.ws = await websockets.connect(DERIV_WS_URL, ping_interval=30, ping_timeout=10)
-            self.is_connected = True
+            # Detect whether to use 2026 Options API (PAT tokens or non-numeric App ID)
+            use_pat_api = clean_token.startswith("pat_") or len(clean_app_id) > 10
             
-            # Start message receiving loop in background
-            if self._ws_task and not self._ws_task.done():
-                self._ws_task.cancel()
-            self._ws_task = asyncio.create_task(self._listen_loop())
-            
-            # Send authorize request
-            auth_res = await self._send_request({"authorize": self.api_token})
-            
-            if "error" in auth_res:
-                err_code = auth_res["error"].get("code", "")
-                raw_msg = auth_res["error"].get("message", "Authorization failed")
-                if "InvalidToken" in err_code:
-                    err_msg = "Deriv rejected the token ('Invalid Token'). Please ensure you created the token in Deriv Account Settings with 'Read' and 'Trade' scopes enabled."
-                else:
-                    err_msg = f"Deriv Auth Error: {raw_msg}"
-                self.is_authorized = False
-                self.log_activity(err_msg, "error")
-                return {"success": False, "error": err_msg}
+            if use_pat_api:
+                self.is_pat_api = True
+                self.log_activity(f"Authenticating with Deriv 2026 Options API (App ID: {clean_app_id})...", "info")
                 
-            auth_data = auth_res.get("authorize", {})
-            self.is_authorized = True
-            self.account_info = {
-                "loginid": auth_data.get("loginid"),
-                "balance": float(auth_data.get("balance", 0.0)),
-                "currency": auth_data.get("currency", "USD"),
-                "is_virtual": bool(auth_data.get("is_virtual", 1)),
-                "email": auth_data.get("email"),
-                "fullname": auth_data.get("fullname"),
-            }
+                # Fetch accounts and OTP in threadpool
+                auth_res = await asyncio.to_thread(self._sync_get_accounts_and_otp, clean_token, clean_app_id)
+                if not auth_res.get("success"):
+                    self.is_authorized = False
+                    self.is_connected = False
+                    err_msg = auth_res.get("error", "Deriv REST authentication failed")
+                    self.log_activity(err_msg, "error")
+                    return {"success": False, "error": err_msg}
+                
+                acct = auth_res["account"]
+                ws_url = auth_res["ws_url"]
+                
+                self.account_info = {
+                    "loginid": acct.get("account_id"),
+                    "balance": float(acct.get("balance", 0.0)),
+                    "currency": acct.get("currency", "USD"),
+                    "is_virtual": acct.get("account_type") == "demo",
+                    "email": None,
+                    "fullname": None,
+                }
+                
+                # Connect WebSocket using OTP URL
+                self.ws = await websockets.connect(ws_url, ping_interval=30, ping_timeout=10)
+                self.is_connected = True
+                self.is_authorized = True
+                
+                # Start message receiving loop
+                if self._ws_task and not self._ws_task.done():
+                    self._ws_task.cancel()
+                self._ws_task = asyncio.create_task(self._listen_loop())
+                
+                # Subscribe to balance updates
+                await self._send_request({"balance": 1, "subscribe": 1})
+                
+                acct_type = "DEMO" if self.account_info["is_virtual"] else "REAL"
+                self.log_activity(
+                    f"🟢 Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}",
+                    "success"
+                )
+                
+                return {
+                    "success": True,
+                    "account": self.account_info,
+                    "config": self.config,
+                    "is_auto_trading": self.is_auto_trading_enabled,
+                }
             
-            # Subscribe to balance updates
-            await self._send_request({"balance": 1, "subscribe": 1})
-            
-            # Subscribe to open contract updates for real-time tracking
-            await self._send_request({"proposal_open_contract": 1, "subscribe": 1})
-            
-            acct_type = "Virtual / Demo" if self.account_info["is_virtual"] else "Real Real-Money"
-            self.log_activity(f"Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}", "success")
-            
-            return {
-                "success": True,
-                "account": self.account_info,
-                "config": self.config,
-                "is_auto_trading": self.is_auto_trading_enabled,
-            }
+            else:
+                # Legacy WebSocket API Fallback
+                self.is_pat_api = False
+                legacy_url = f"wss://ws.derivws.com/websockets/v3?app_id={clean_app_id if clean_app_id.isdigit() else 1089}"
+                self.log_activity(f"Connecting to Deriv WebSocket API ({legacy_url})...", "info")
+                self.ws = await websockets.connect(legacy_url, ping_interval=30, ping_timeout=10)
+                self.is_connected = True
+                
+                if self._ws_task and not self._ws_task.done():
+                    self._ws_task.cancel()
+                self._ws_task = asyncio.create_task(self._listen_loop())
+                
+                # Authorize
+                auth_res = await self._send_request({"authorize": self.api_token})
+                if "error" in auth_res:
+                    err_code = auth_res["error"].get("code", "")
+                    raw_msg = auth_res["error"].get("message", "Authorization failed")
+                    if "InvalidToken" in err_code:
+                        err_msg = "Deriv rejected the token ('Invalid Token'). If using a Personal Access Token, ensure App ID is set."
+                    else:
+                        err_msg = f"Deriv Auth Error: {raw_msg}"
+                    self.is_authorized = False
+                    self.log_activity(err_msg, "error")
+                    return {"success": False, "error": err_msg}
+                    
+                auth_data = auth_res.get("authorize", {})
+                self.is_authorized = True
+                self.account_info = {
+                    "loginid": auth_data.get("loginid"),
+                    "balance": float(auth_data.get("balance", 0.0)),
+                    "currency": auth_data.get("currency", "USD"),
+                    "is_virtual": bool(auth_data.get("is_virtual", 1)),
+                    "email": auth_data.get("email"),
+                    "fullname": auth_data.get("fullname"),
+                }
+                
+                await self._send_request({"balance": 1, "subscribe": 1})
+                await self._send_request({"proposal_open_contract": 1, "subscribe": 1})
+                
+                acct_type = "DEMO" if self.account_info["is_virtual"] else "REAL"
+                self.log_activity(f"🟢 Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}", "success")
+                
+                return {
+                    "success": True,
+                    "account": self.account_info,
+                    "config": self.config,
+                    "is_auto_trading": self.is_auto_trading_enabled,
+                }
             
         except Exception as e:
             self.is_connected = False
@@ -198,7 +313,7 @@ class DerivAutoTrader:
             except Exception:
                 pass
                 
-        self.log_activity("Disconnected from Deriv API. Auto-trading disabled.", "info")
+        self.log_activity("Disconnected from Deriv API. Auto-trading paused.", "info")
         return {"success": True, "message": "Disconnected successfully"}
 
     def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,7 +323,7 @@ class DerivAutoTrader:
                 self.config[k] = v
         if "is_auto_trading_enabled" in new_config:
             self.is_auto_trading_enabled = bool(new_config["is_auto_trading_enabled"])
-            status_str = "ENABLED" if self.is_auto_trading_enabled else "DISABLED"
+            status_str = "ACTIVE ⚡" if self.is_auto_trading_enabled else "PAUSED ⏸️"
             self.log_activity(f"Auto-Trading switched to: {status_str}", "info")
             
         return {
@@ -233,11 +348,12 @@ class DerivAutoTrader:
             
         deriv_symbol = self.map_symbol(symbol)
         contract_type = "CALL" if signal_type.upper() == "CALL" else "PUT"
-        trade_stake = float(stake or self.config.get("default_stake", 10.0))
+        trade_stake = float(stake or self.config.get("default_stake", 1.0))
         trade_duration = int(duration or self.config.get("preferred_duration", 5))
         trade_unit = str(duration_unit or self.config.get("duration_unit", "m"))
         
         # 1. Request Proposal from Deriv
+        # In 2026 Options API, the field is 'underlying_symbol', in legacy it is 'symbol'
         proposal_req = {
             "proposal": 1,
             "amount": trade_stake,
@@ -246,15 +362,19 @@ class DerivAutoTrader:
             "currency": self.account_info.get("currency", "USD"),
             "duration": trade_duration,
             "duration_unit": trade_unit,
-            "symbol": deriv_symbol,
         }
+        
+        if self.is_pat_api:
+            proposal_req["underlying_symbol"] = deriv_symbol
+        else:
+            proposal_req["symbol"] = deriv_symbol
         
         self.log_activity(f"Requesting contract proposal: {contract_type} on {deriv_symbol} (${trade_stake} for {trade_duration}{trade_unit})...", "info")
         
         proposal_res = await self._send_request(proposal_req)
         if "error" in proposal_res:
             err_msg = proposal_res["error"].get("message", "Proposal request rejected by Deriv")
-            self.log_activity(f"Trade Proposal failed: {err_msg}", "error")
+            self.log_activity(f"Trade Proposal failed ({deriv_symbol}): {err_msg}", "error")
             return {"success": False, "error": err_msg}
             
         proposal_id = proposal_res.get("proposal", {}).get("id")
@@ -270,12 +390,22 @@ class DerivAutoTrader:
         buy_res = await self._send_request(buy_req)
         if "error" in buy_res:
             err_msg = buy_res["error"].get("message", "Buy execution rejected by Deriv")
-            self.log_activity(f"Buy execution failed: {err_msg}", "error")
+            self.log_activity(f"Buy execution failed ({deriv_symbol}): {err_msg}", "error")
             return {"success": False, "error": err_msg}
             
         buy_info = buy_res.get("buy", {})
         contract_id = buy_info.get("contract_id")
         buy_price = float(buy_info.get("buy_price", trade_stake))
+        
+        # 3. Subscribe to open contract updates for live settlement tracking
+        try:
+            await self._send_request({
+                "proposal_open_contract": 1,
+                "contract_id": contract_id,
+                "subscribe": 1,
+            })
+        except Exception:
+            pass
         
         # Record into active tracking
         trade_record = {
@@ -296,7 +426,7 @@ class DerivAutoTrader:
         self.trade_cooldowns[symbol] = time.time()
         
         self.log_activity(
-            f"✅ BOUGHT {contract_type} on {deriv_symbol} | Contract ID: {contract_id} | Stake: ${buy_price:.2f} | Potential Payout: ${payout:.2f}",
+            f"✅ BOUGHT {contract_type} on {deriv_symbol} | ID: #{contract_id} | Stake: ${buy_price:.2f} | Est Payout: ${payout:.2f}",
             "success",
             trade_record
         )
@@ -323,19 +453,19 @@ class DerivAutoTrader:
             return None
             
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 75))
+        min_conf = float(self.config.get("min_confidence", 80))
         if confidence < min_conf:
             return None
             
         # Risk Check: Daily Profit Target
-        if self.daily_pnl >= float(self.config.get("take_profit_daily", 50.0)):
-            self.log_activity(f"Daily Take-Profit Target (+${self.daily_pnl:.2f}) reached. Auto-trading paused.", "warning")
+        if self.daily_pnl >= float(self.config.get("take_profit_daily", 10.0)):
+            self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f}) reached. Auto-trading paused.", "warning")
             self.is_auto_trading_enabled = False
             return None
             
-        # Risk Check: Daily Stop Loss
-        if self.daily_pnl <= -float(self.config.get("stop_loss_daily", 25.0)):
-            self.log_activity(f"Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f}) hit. Auto-trading stopped for protection.", "warning")
+        # Risk Check: Daily Stop Loss (2 losses @ $1 stake = $2.00)
+        if self.daily_pnl <= -float(self.config.get("stop_loss_daily", 2.0)):
+            self.log_activity(f"🛑 Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f}) reached. Auto-trading stopped to protect capital.", "warning")
             self.is_auto_trading_enabled = False
             return None
             
@@ -375,12 +505,16 @@ class DerivAutoTrader:
         return await self.execute_trade(
             symbol=symbol,
             signal_type=sig_type,
-            stake=self.config.get("default_stake", 10.0),
+            stake=self.config.get("default_stake", 1.0),
             duration=duration,
             duration_unit=duration_unit,
             confidence=confidence,
             reasons=signal_data.get("reasons", []),
         )
+
+    async def on_signal_received(self, symbol: str, signal_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Public alias for evaluate_auto_trade_signal."""
+        return await self.evaluate_auto_trade_signal(signal_data=signal_data, symbol=symbol)
 
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
@@ -388,6 +522,8 @@ class DerivAutoTrader:
             "is_connected": self.is_connected,
             "is_authorized": self.is_authorized,
             "is_auto_trading_enabled": self.is_auto_trading_enabled,
+            "is_pat_api": self.is_pat_api,
+            "app_id": self.app_id,
             "account": self.account_info,
             "config": self.config,
             "stats": {
