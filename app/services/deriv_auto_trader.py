@@ -63,6 +63,8 @@ DERIV_SYMBOL_MAP = {
 
 # Watchlist for 24/7 Autonomous Cloud Scanner
 AUTONOMOUS_WATCHLIST = [
+    # Synthetic Volatility Indices (100% 24/7/365 Active - Always Open!)
+    "R_100", "R_75", "R_50", "1HZ100V", "1HZ75V",
     # Cryptocurrencies (24/7/365 active)
     "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT",
     # Forex Majors & Crosses (active when forex market is open)
@@ -431,8 +433,21 @@ class DerivAutoTrader:
         proposal_res = await self._send_request(proposal_req)
         if "error" in proposal_res:
             err_msg = proposal_res["error"].get("message", "Proposal request rejected by Deriv")
-            self.log_activity(f"Trade Proposal failed ({deriv_symbol}): {err_msg}", "error")
-            return {"success": False, "error": err_msg}
+            # If rejected due to duration, automatically retry with Deriv standard 5m or 60s
+            if "duration" in err_msg.lower():
+                alt_duration = 5 if deriv_symbol.startswith("frx") else 60
+                alt_unit = "m" if deriv_symbol.startswith("frx") else "s"
+                self.log_activity(f"Retrying proposal for {deriv_symbol} with standard {alt_duration}{alt_unit} duration...", "info")
+                proposal_req["duration"] = alt_duration
+                proposal_req["duration_unit"] = alt_unit
+                proposal_res = await self._send_request(proposal_req)
+                if "error" in proposal_res:
+                    err_msg = proposal_res["error"].get("message", "Proposal request rejected by Deriv")
+                    self.log_activity(f"Trade Proposal failed ({deriv_symbol}): {err_msg}", "error")
+                    return {"success": False, "error": err_msg}
+            else:
+                self.log_activity(f"Trade Proposal failed ({deriv_symbol}): {err_msg}", "error")
+                return {"success": False, "error": err_msg}
             
         proposal_id = proposal_res.get("proposal", {}).get("id")
         payout = proposal_res.get("proposal", {}).get("payout", 0.0)
@@ -573,23 +588,17 @@ class DerivAutoTrader:
         if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 3)):
             return None
             
-        # Parse suggested trade duration
+        # Standardize duration for Deriv API:
+        # Forex & Commodities contracts only accept >= 5m (e.g. 5m, 15m)
+        # Synthetics accept 60s or 5m
+        deriv_sym = self.map_symbol(symbol)
         duration_str = str(signal_data.get("suggested_trade_time", "5min")).lower()
-        if "30s" in duration_str:
-            duration = 30
+        if deriv_sym.startswith("frx") or "cry" in deriv_sym:
+            duration = 15 if ("15m" in duration_str or "15min" in duration_str) else 5
+            duration_unit = "m"
+        elif deriv_sym in ("R_100", "R_75", "R_50", "R_25", "R_10", "1HZ100V", "1HZ75V", "1HZ50V", "1HZ25V", "1HZ10V"):
+            duration = 60
             duration_unit = "s"
-        elif "1min" in duration_str or "1m" in duration_str:
-            duration = 1
-            duration_unit = "m"
-        elif "2min" in duration_str or "2m" in duration_str:
-            duration = 2
-            duration_unit = "m"
-        elif "3min" in duration_str or "3m" in duration_str:
-            duration = 3
-            duration_unit = "m"
-        elif "15min" in duration_str:
-            duration = 15
-            duration_unit = "m"
         else:
             duration = 5
             duration_unit = "m"

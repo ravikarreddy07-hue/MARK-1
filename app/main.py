@@ -372,6 +372,11 @@ SCANNER_WATCHLIST = [
     {"symbol": "DOGEUSDT", "market": "Crypto", "name": "DOGE / USDT", "tvSymbol": "BINANCE:DOGEUSDT"},
     {"symbol": "PEPEUSDT", "market": "Crypto", "name": "PEPE / USDT", "tvSymbol": "BINANCE:PEPEUSDT"},
     {"symbol": "SUIUSDT",  "market": "Crypto", "name": "SUI / USDT", "tvSymbol": "BINANCE:SUIUSDT"},
+    # Synthetic Volatility Indices (24/7/365 Always Active on Deriv)
+    {"symbol": "R_100",   "market": "Synthetics", "name": "Volatility 100 Index", "tvSymbol": "DERIV:R_100"},
+    {"symbol": "R_75",    "market": "Synthetics", "name": "Volatility 75 Index", "tvSymbol": "DERIV:R_75"},
+    {"symbol": "R_50",    "market": "Synthetics", "name": "Volatility 50 Index", "tvSymbol": "DERIV:R_50"},
+    {"symbol": "1HZ100V", "market": "Synthetics", "name": "Vol 100 (1s) Index", "tvSymbol": "DERIV:1HZ100V"},
 ]
 
 

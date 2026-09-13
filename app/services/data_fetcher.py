@@ -160,6 +160,16 @@ def generate_synthetic_data(symbol: str, interval: str, limit: int = 500) -> Lis
         base_price = 420.0
     elif "AMZN" in sym:
         base_price = 190.0
+    elif "R_100" in sym or "1HZ100V" in sym:
+        base_price = 554.0
+    elif "R_75" in sym or "1HZ75V" in sym:
+        base_price = 350.0
+    elif "R_50" in sym or "1HZ50V" in sym:
+        base_price = 250.0
+    elif "R_25" in sym or "1HZ25V" in sym:
+        base_price = 150.0
+    elif "R_10" in sym or "1HZ10V" in sym:
+        base_price = 50.0
     else:
         base_price = 100.0
 
@@ -194,7 +204,8 @@ def generate_synthetic_data(symbol: str, interval: str, limit: int = 500) -> Lis
 NON_BINANCE_SYMBOLS = (
     "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
     "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "GBPAUD", "USDINR",
-    "SPX", "NDX", "DJI", "GOLD", "SILVER", "USOIL", "AAPL", "TSLA", "NVDA", "MSFT", "AMZN"
+    "SPX", "NDX", "DJI", "GOLD", "SILVER", "USOIL", "AAPL", "TSLA", "NVDA", "MSFT", "AMZN",
+    "R_100", "R_75", "R_50", "R_25", "R_10", "1HZ100V", "1HZ75V", "1HZ50V", "1HZ25V", "1HZ10V"
 )
 
 def fetch_ohlcv_with_source(

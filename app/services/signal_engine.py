@@ -10,7 +10,7 @@ NY_CLOSE     = 21.0   # 21:00 UTC = 02:30 IST+1
 
 # ─── Asset type detection ─────────────────────────────────────────────────────
 CRYPTO_SUFFIXES  = ("USDT", "USDC", "BTC", "ETH", "BNB")
-SYNTH_KEYWORDS   = ("Volatility", "Boom", "Crash", "Jump", "Step", "Range")
+SYNTH_KEYWORDS   = ("Volatility", "Boom", "Crash", "Jump", "Step", "Range", "R_", "1HZ", "HZ")
 FOREX_KEYWORDS   = ("USD", "EUR", "GBP", "JPY", "AUD", "NZD", "CAD", "CHF", "INR")
 
 def detect_asset_type(symbol: str) -> str:
