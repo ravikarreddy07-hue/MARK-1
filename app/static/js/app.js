@@ -808,15 +808,18 @@ class BinaryApp {
             const pnlClass = t.pnl > 0 ? "win" : t.pnl < 0 ? "loss" : "";
 
             const durLabel = t.duration_seconds >= 60 ? `${Math.round(t.duration_seconds / 60)}m` : `${t.duration_seconds}s`;
+            const stakeDisplay = `$${Number(t.stake || 1.0).toFixed(2)}`;
+            const entryDisplay = t.entry_price ? Number(t.entry_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '--';
+            const exitDisplay = t.exit_price ? Number(t.exit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '<span style="color:var(--accent-blue)">ACTIVE...</span>';
 
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td><strong>${t.symbol}</strong></td>
-                <td><span class="badge-tag">${t.timeframe}</span></td>
                 <td><span class="badge-sig ${t.signal.toLowerCase()}">${t.signal}</span></td>
                 <td>${durLabel}</td>
-                <td>$${Number(t.entry_price).toFixed(2)}</td>
-                <td>${t.exit_price ? '$' + Number(t.exit_price).toFixed(2) : '<span style="color:var(--accent-blue)">ACTIVE...</span>'}</td>
+                <td><strong style="color: #fff;">${stakeDisplay}</strong></td>
+                <td style="color: var(--text-secondary);">${entryDisplay}</td>
+                <td style="color: var(--text-secondary);">${exitDisplay}</td>
                 <td><span class="badge-sig ${outClass}">${t.outcome}</span></td>
                 <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}$${Number(t.pnl).toFixed(2)}</td>
             `;

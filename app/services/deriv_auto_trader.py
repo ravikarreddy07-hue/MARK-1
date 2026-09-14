@@ -895,9 +895,11 @@ class DerivAutoTrader:
                     from app.services.trade_manager import trade_manager
                     tm_id = trade.get("tm_id")
                     if tm_id:
+                        exit_p = float(poc.get("exit_spot") or poc.get("current_spot") or poc.get("exit_tick") or 0.0)
                         trade_manager.update_trade_outcome(
                             trade_id=tm_id,
                             outcome="WIN" if profit > 0 else "LOSS",
+                            exit_price=exit_p if exit_p > 0 else None,
                         )
                 except Exception:
                     pass
