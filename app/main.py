@@ -377,20 +377,26 @@ SCANNER_WATCHLIST = [
     {"symbol": "R_100",   "market": "Synthetics", "name": "Volatility 100 Index", "tvSymbol": "DERIV:R_100"},
     {"symbol": "R_75",    "market": "Synthetics", "name": "Volatility 75 Index", "tvSymbol": "DERIV:R_75"},
     {"symbol": "R_50",    "market": "Synthetics", "name": "Volatility 50 Index", "tvSymbol": "DERIV:R_50"},
+    {"symbol": "R_25",    "market": "Synthetics", "name": "Volatility 25 Index", "tvSymbol": "DERIV:R_25"},
+    {"symbol": "R_10",    "market": "Synthetics", "name": "Volatility 10 Index", "tvSymbol": "DERIV:R_10"},
     {"symbol": "1HZ100V", "market": "Synthetics", "name": "Vol 100 (1s) Index", "tvSymbol": "DERIV:1HZ100V"},
+    {"symbol": "1HZ75V",  "market": "Synthetics", "name": "Vol 75 (1s) Index", "tvSymbol": "DERIV:1HZ75V"},
+    {"symbol": "1HZ50V",  "market": "Synthetics", "name": "Vol 50 (1s) Index", "tvSymbol": "DERIV:1HZ50V"},
+    {"symbol": "1HZ25V",  "market": "Synthetics", "name": "Vol 25 (1s) Index", "tvSymbol": "DERIV:1HZ25V"},
+    {"symbol": "1HZ10V",  "market": "Synthetics", "name": "Vol 10 (1s) Index", "tvSymbol": "DERIV:1HZ10V"},
 ]
 
 
 @app.get("/api/scanner/signals")
 def get_scanner_signals(
     interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
-    market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks, high_conf, elite_forex"),
+    market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks, Synthetics, high_conf, elite_forex"),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
     elite_mode: bool = Query(False, description="Filter to Elite 70% Whitelist and Grade A+ Setups (>=80% conf)"),
 ):
     """
     Live Multi-Chart Signal Scanner: Evaluates live signals across all market charts simultaneously.
-    Supports High-Conf Forex and Elite 70% Sniper Mode filtering.
+    Supports high-confidence setups and market categories.
     """
     is_elite = elite_mode or (bool(market_filter) and market_filter.lower() in ("high_conf", "elite_forex"))
     
@@ -398,12 +404,10 @@ def get_scanner_signals(
     if market_filter:
         mf = market_filter.lower()
         if mf in ("high_conf", "elite_forex"):
-            # High-Conf Forex: Whitelisted Forex pairs only
+            # Whitelisted Forex pairs
             items_to_scan = [i for i in SCANNER_WATCHLIST if i["market"].lower() == "forex" and i["symbol"] in ELITE_70_SYMBOLS]
         elif mf != "all":
             items_to_scan = [i for i in SCANNER_WATCHLIST if i["market"].lower() == mf]
-    elif elite_mode:
-        items_to_scan = [i for i in SCANNER_WATCHLIST if i["symbol"] in ELITE_70_SYMBOLS]
 
     results = []
     for item in items_to_scan:
@@ -422,14 +426,10 @@ def get_scanner_signals(
                 asset_type=detect_asset_type(sym),
                 engine_version=engine,
                 symbol=sym,
-                is_elite_mode=is_elite,
+                is_elite_mode=False,
             )
             curr_sig = sig_data["current"]
             conf = curr_sig.get("confidence", 0)
-
-            # In high_conf or elite mode, only show actionable signals with confidence >= 80% (Grade A+)
-            if is_elite and (curr_sig.get("signal") not in ("CALL", "PUT") or conf < 80):
-                continue
 
             # Auto-execute trade on Deriv if enabled and signal meets confidence criteria
             if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT"):
@@ -450,6 +450,8 @@ def get_scanner_signals(
             price = candles[-1]["close"]
             digits = 5 if price < 5 else (3 if "JPY" in sym else 2)
 
+            is_elite_sig = curr_sig.get("is_elite", False) or conf >= 80 or sym in ELITE_70_SYMBOLS
+
             results.append({
                 "symbol": sym,
                 "name": item["name"],
@@ -459,7 +461,7 @@ def get_scanner_signals(
                 "signal": curr_sig.get("signal", "NEUTRAL"),
                 "confidence": conf,
                 "score": curr_sig.get("score", 0),
-                "is_elite": curr_sig.get("is_elite", False) or conf >= 80,
+                "is_elite": is_elite_sig,
                 "suggested_trade_time": curr_sig.get("suggested_trade_time", "5min"),
                 "suggested_trade_label": curr_sig.get("suggested_trade_label", "5 Min"),
                 "suggested_trade_seconds": curr_sig.get("suggested_trade_seconds", 300),
@@ -468,6 +470,10 @@ def get_scanner_signals(
             })
         except Exception:
             continue
+
+    # Strict high_conf filter if explicitly requested via query param
+    if market_filter and market_filter.lower() in ("high_conf", "elite_forex"):
+        results = [r for r in results if r["confidence"] >= 80 and r["market"] == "Forex"]
 
     # Sort so high-confidence actionable setups appear first
     results.sort(key=lambda x: (x["signal"] in ("CALL", "PUT"), x["confidence"]), reverse=True)

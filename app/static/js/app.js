@@ -81,6 +81,21 @@ const ASSET_CATALOG = [
             { value: "MSFT", tvSymbol: "NASDAQ:MSFT", label: "Microsoft Corp (MSFT)" },
             { value: "AMZN", tvSymbol: "NASDAQ:AMZN", label: "Amazon.com Inc. (AMZN)" },
         ]
+    },
+    {
+        group: "⚡ Deriv Synthetic Indices",
+        symbols: [
+            { value: "R_100", tvSymbol: "DERIV:R_100", label: "Volatility 100 Index" },
+            { value: "R_75", tvSymbol: "DERIV:R_75", label: "Volatility 75 Index" },
+            { value: "R_50", tvSymbol: "DERIV:R_50", label: "Volatility 50 Index" },
+            { value: "R_25", tvSymbol: "DERIV:R_25", label: "Volatility 25 Index" },
+            { value: "R_10", tvSymbol: "DERIV:R_10", label: "Volatility 10 Index" },
+            { value: "1HZ100V", tvSymbol: "DERIV:1HZ100V", label: "Vol 100 (1s) Index" },
+            { value: "1HZ75V", tvSymbol: "DERIV:1HZ75V", label: "Vol 75 (1s) Index" },
+            { value: "1HZ50V", tvSymbol: "DERIV:1HZ50V", label: "Vol 50 (1s) Index" },
+            { value: "1HZ25V", tvSymbol: "DERIV:1HZ25V", label: "Vol 25 (1s) Index" },
+            { value: "1HZ10V", tvSymbol: "DERIV:1HZ10V", label: "Vol 10 (1s) Index" },
+        ]
     }
 ];
 
@@ -125,6 +140,9 @@ class BinaryApp {
             }
         }
         if (sym.includes(":")) return sym;
+        if (sym.startsWith("R_") || sym.startsWith("1HZ")) {
+            return `DERIV:${sym.toUpperCase()}`;
+        }
         const forexQuotes = ["USD", "JPY", "EUR", "GBP", "CHF", "CAD", "AUD", "NZD", "INR"];
         if (sym.length === 6 && forexQuotes.some(q => sym.endsWith(q))) {
             return `FX:${sym.toUpperCase()}`;
@@ -406,7 +424,7 @@ class BinaryApp {
 
     async loadSignalsStream() {
         try {
-            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}&elite_mode=${this.eliteMode}`);
+            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}`);
             if (!res.ok) return;
             const data = await res.json();
             this.streamData = data.signals || [];
@@ -424,10 +442,10 @@ class BinaryApp {
 
         let filtered = this.streamData;
         if (this.streamFilter === "high_conf") {
-            // Show ONLY Forex pairs with Grade A+ confirmed signals (>=80% confidence)
-            filtered = this.streamData.filter((s) => s.market === "Forex" && (s.signal === "CALL" || s.signal === "PUT") && s.confidence >= 80);
-        } else if (this.streamFilter !== "all") {
-            filtered = this.streamData.filter((s) => s.market.toLowerCase() === this.streamFilter.toLowerCase());
+            // Show ONLY confirmed signals (CALL or PUT with >=80% confidence)
+            filtered = this.streamData.filter((s) => (s.signal === "CALL" || s.signal === "PUT") && s.confidence >= 80);
+        } else if (this.streamFilter && this.streamFilter !== "all") {
+            filtered = this.streamData.filter((s) => s.market && s.market.toLowerCase() === this.streamFilter.toLowerCase());
         }
 
         const actionable = this.streamData.filter((s) => s.signal === "CALL" || s.signal === "PUT").length;
@@ -438,7 +456,14 @@ class BinaryApp {
         grid.innerHTML = "";
 
         if (filtered.length === 0) {
-            grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-secondary); font-size: 12px;">No signals matching this filter right now. Monitoring multi-chart market ticks...</div>`;
+            if (this.streamFilter === "high_conf") {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 25px; color: var(--text-secondary); font-size: 12px; background: rgba(255, 215, 0, 0.05); border: 1px dashed rgba(255, 215, 0, 0.3); border-radius: 8px;">
+                    <div style="font-weight: 700; color: #ffd700; font-size: 13px; margin-bottom: 4px;">🎯 Elite Sniper Mode: No Active ≥80% Confluence Breakouts Right Now</div>
+                    <div>Scanning ${this.streamData.length} live charts continuously. Only high-probability Grade A+ setups will trigger here to protect win rate.</div>
+                </div>`;
+            } else {
+                grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 20px; color: var(--text-secondary); font-size: 12px;">No signals matching "${this.streamFilter}" right now. Monitoring multi-chart market ticks...</div>`;
+            }
             return;
         }
 
@@ -450,7 +475,7 @@ class BinaryApp {
             const badgeClass = item.signal === "CALL" ? "call" : item.signal === "PUT" ? "put" : "neutral";
             const prefix = item.is_elite || item.confidence >= 80 ? "🎯 " : "";
             const badgeText = item.signal === "CALL" ? `${prefix}CALL ${item.confidence}%` : item.signal === "PUT" ? `${prefix}PUT ${item.confidence}%` : `● CONSOLIDATION`;
-            const icon = item.market === "Forex" ? "💱" : item.market === "Crypto" ? "🔥" : item.market === "Commodities" ? "🥇" : "📈";
+            const icon = item.market === "Forex" ? "💱" : item.market === "Crypto" ? "🔥" : item.market === "Commodities" ? "🥇" : item.market === "Synthetics" ? "⚡" : "📈";
 
             const reasonText = item.reasons && item.reasons.length > 0 ? item.reasons[0] : "Confluence Scanning";
             const tradeTimeTag = item.suggested_trade_time === "30s" ? "30 Sec" :
