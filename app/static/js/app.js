@@ -400,6 +400,18 @@ class BinaryApp {
             btnApplyOptimal.addEventListener("click", () => this.applyOptimalParameters());
         }
 
+        // Manual Refresh Trade History
+        const btnRefreshTrades = document.getElementById("btn-refresh-trades");
+        if (btnRefreshTrades) {
+            btnRefreshTrades.addEventListener("click", async () => {
+                const oldText = btnRefreshTrades.textContent;
+                btnRefreshTrades.textContent = "⏳ Refreshing...";
+                await this.loadTradeHistory();
+                btnRefreshTrades.textContent = oldText;
+                this.showToast("📋 Trade History updated manually.", "info");
+            });
+        }
+
         // Clear Trade History
         const btnClearTrades = document.getElementById("btn-clear-trades");
         if (btnClearTrades) {
@@ -418,7 +430,6 @@ class BinaryApp {
         this.pollInterval = setInterval(() => {
             this.loadMarketData(false);
             this.loadSignalsStream();
-            this.loadTradeHistory();
         }, 4500);
     }
 
@@ -1264,9 +1275,6 @@ class BinaryApp {
                 const marketInp = document.getElementById("deriv-market-input");
                 if (marketInp && document.activeElement !== marketInp && data.config.allowed_market !== undefined) marketInp.value = data.config.allowed_market;
             }
-
-            // Also refresh live trade table
-            this.loadTradeHistory();
 
             // Render live activity feed
             if (logEl && data.recent_activity && data.recent_activity.length > 0) {
