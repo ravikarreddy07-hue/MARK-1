@@ -718,7 +718,7 @@ class DerivAutoTrader:
             "style": "candles",
             "granularity": granularity,
         }
-        res = await self._send_request(req)
+        res = await self._send_request(req, timeout=1.5)
         raw_candles = res.get("candles", [])
         if not raw_candles:
             return []
@@ -757,8 +757,8 @@ class DerivAutoTrader:
                             break
                         try:
                             candles = None
-                            # Stream live candles directly from Deriv WebSocket if available
-                            if self.is_connected and self.ws:
+                            # Stream live candles directly from Deriv WebSocket if available (Synthetics only)
+                            if self.is_connected and self.ws and any(sym.startswith(p) for p in ("R_", "1HZ")):
                                 try:
                                     candles = await self.fetch_deriv_candles(sym, count=100, granularity=60)
                                 except Exception:
@@ -841,7 +841,7 @@ class DerivAutoTrader:
             "recent_activity": self.activity_log[:20],
         }
 
-    async def _send_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _send_request(self, payload: Dict[str, Any], timeout: float = 6.0) -> Dict[str, Any]:
         """Sends request to Deriv WebSocket and awaits matching response."""
         req_id = self._req_id
         self._req_id += 1
@@ -854,11 +854,11 @@ class DerivAutoTrader:
         await self.ws.send(json.dumps(payload))
         
         try:
-            res = await asyncio.wait_for(fut, timeout=15)
+            res = await asyncio.wait_for(fut, timeout=timeout)
             return res
         except asyncio.TimeoutError:
             self._pending_requests.pop(req_id, None)
-            return {"error": {"message": "WebSocket request timed out after 15s"}}
+            return {"error": {"message": f"WebSocket request timed out after {timeout}s"}}
 
     async def _listen_loop(self):
         """Asynchronous message dispatcher for Deriv WebSocket streams."""
