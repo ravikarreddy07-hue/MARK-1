@@ -741,8 +741,8 @@ class DerivAutoTrader:
         server even if the user's browser is closed or computer is turned off.
         """
         logger.info("Autonomous Cloud Trading Engine initialized.")
-        # Brief warmup delay after server startup
-        await asyncio.sleep(6)
+        # Startup grace period so server binds port and handles initial health checks immediately
+        await asyncio.sleep(12)
         
         while True:
             try:
@@ -756,16 +756,8 @@ class DerivAutoTrader:
                         if not self.is_auto_trading_enabled:
                             break
                         try:
-                            candles = None
-                            # Stream live candles directly from Deriv WebSocket if available (Synthetics only)
-                            if self.is_connected and self.ws and any(sym.startswith(p) for p in ("R_", "1HZ")):
-                                try:
-                                    candles = await self.fetch_deriv_candles(sym, count=100, granularity=60)
-                                except Exception:
-                                    candles = None
-                            
-                            if not candles or len(candles) < 30:
-                                candles, _ = fetch_ohlcv_with_source(symbol=sym, interval="1m", limit=100)
+                            # Use fast high-performance candle provider without making unhandled WS calls
+                            candles, _ = fetch_ohlcv_with_source(symbol=sym, interval="1m", limit=100)
 
                             if not candles or len(candles) < 30:
                                 continue
@@ -788,7 +780,7 @@ class DerivAutoTrader:
                                 await self.evaluate_auto_trade_signal(curr_sig, sym)
                         except Exception as sym_err:
                             logger.debug(f"Error scanning {sym}: {sym_err}")
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(0.3)
             except Exception as e:
                 logger.error(f"Error in autonomous scanner loop: {e}")
                 
@@ -892,12 +884,13 @@ class DerivAutoTrader:
                 if self._running and self.api_token:
                     self.is_connected = False
                     self.is_authorized = False
-                    self.log_activity("WebSocket connection dropped. Reconnecting in 3s...", "warning")
-                    await asyncio.sleep(3)
+                    self.log_activity("WebSocket connection dropped. Reconnecting in 5s...", "warning")
+                    await asyncio.sleep(5)
                     try:
                         await self.connect(self.api_token, self.app_id)
                     except Exception as re_err:
                         logger.error(f"Auto-reconnect failed: {re_err}")
+                        await asyncio.sleep(10)
                 else:
                     await asyncio.sleep(1)
 
