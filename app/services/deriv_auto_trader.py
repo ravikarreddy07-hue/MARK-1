@@ -64,14 +64,12 @@ DERIV_SYMBOL_MAP = {
 
 # Watchlist for 24/7 Autonomous Cloud Scanner
 AUTONOMOUS_WATCHLIST = [
-    # Synthetic Volatility Indices (100% 24/7/365 Active - Always Open!)
-    "R_100", "R_75", "R_50", "1HZ100V", "1HZ75V",
-    # Cryptocurrencies (24/7/365 active)
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT",
-    # Forex Majors & Crosses (active when forex market is open)
+    # Synthetic Volatility Indices (100% 24/7/365 Active - Always Open on Deriv!)
+    "R_100", "R_75", "R_50", "R_25", "R_10", "1HZ100V", "1HZ75V", "1HZ50V", "1HZ25V", "1HZ10V",
+    # Forex Majors & Crosses (Standard Deriv 15m digital options)
     "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD",
     "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "GBPAUD",
-    # Commodities
+    # Commodities / Metals (5m - 15m digital options)
     "GOLD", "SILVER",
 ]
 
@@ -409,10 +407,29 @@ class DerivAutoTrader:
             return {"success": False, "error": "Not connected or authorized on Deriv"}
             
         deriv_symbol = self.map_symbol(symbol)
+        if deriv_symbol.startswith("cry"):
+            err_msg = f"Deriv does not offer binary CALL/PUT options on {symbol} (crypto multipliers only). Skipping."
+            self.log_activity(err_msg, "warning")
+            return {"success": False, "error": err_msg}
+
         contract_type = "CALL" if signal_type.upper() == "CALL" else "PUT"
         trade_stake = float(stake or self.config.get("default_stake", 1.0))
-        trade_duration = int(duration or self.config.get("preferred_duration", 5))
-        trade_unit = str(duration_unit or self.config.get("duration_unit", "m"))
+        
+        # Enforce exact Deriv binary options duration requirements:
+        # Forex requires >= 15m; Gold/Silver 5m or 15m; Synthetics 60s
+        if deriv_symbol.startswith("frx"):
+            if "XAU" in deriv_symbol or "XAG" in deriv_symbol:
+                trade_duration = int(duration or 5)
+                trade_unit = "m"
+            else:
+                trade_duration = 15
+                trade_unit = "m"
+        elif any(deriv_symbol.startswith(p) for p in ("R_", "1HZ")):
+            trade_duration = 60
+            trade_unit = "s"
+        else:
+            trade_duration = int(duration or 15)
+            trade_unit = str(duration_unit or "m")
         
         # 1. Request Proposal from Deriv
         # In 2026 Options API, the field is 'underlying_symbol', in legacy it is 'symbol'
@@ -436,10 +453,18 @@ class DerivAutoTrader:
         proposal_res = await self._send_request(proposal_req)
         if "error" in proposal_res:
             err_msg = proposal_res["error"].get("message", "Proposal request rejected by Deriv")
-            # If rejected due to duration, automatically retry with Deriv standard 5m or 60s
+            # If rejected due to duration, automatically retry with Deriv standard:
+            # Commodities: 5m | Forex: 15m | Synthetics: 60s
             if "duration" in err_msg.lower():
-                alt_duration = 5 if deriv_symbol.startswith("frx") else 60
-                alt_unit = "m" if deriv_symbol.startswith("frx") else "s"
+                if "XAU" in deriv_symbol or "XAG" in deriv_symbol:
+                    alt_duration = 5
+                    alt_unit = "m"
+                elif deriv_symbol.startswith("frx"):
+                    alt_duration = 15
+                    alt_unit = "m"
+                else:
+                    alt_duration = 60
+                    alt_unit = "s"
                 self.log_activity(f"Retrying proposal for {deriv_symbol} with standard {alt_duration}{alt_unit} duration...", "info")
                 proposal_req["duration"] = alt_duration
                 proposal_req["duration_unit"] = alt_unit
@@ -591,19 +616,25 @@ class DerivAutoTrader:
         if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 3)):
             return None
             
-        # Standardize duration for Deriv API:
-        # Forex & Commodities contracts only accept >= 5m (e.g. 5m, 15m)
-        # Synthetics accept 60s or 5m
+        # Check if asset is supported for binary options
         deriv_sym = self.map_symbol(symbol)
-        duration_str = str(signal_data.get("suggested_trade_time", "5min")).lower()
-        if deriv_sym.startswith("frx") or "cry" in deriv_sym:
-            duration = 15 if ("15m" in duration_str or "15min" in duration_str) else 5
-            duration_unit = "m"
-        elif deriv_sym in ("R_100", "R_75", "R_50", "R_25", "R_10", "1HZ100V", "1HZ75V", "1HZ50V", "1HZ25V", "1HZ10V"):
+        if deriv_sym.startswith("cry"):
+            return None
+
+        # Standardize duration for Deriv API:
+        # Forex requires >= 15m; Gold/Silver accepts 5m; Synthetics accept 60s
+        if deriv_sym.startswith("frx"):
+            if "XAU" in deriv_sym or "XAG" in deriv_sym:
+                duration = 5
+                duration_unit = "m"
+            else:
+                duration = 15
+                duration_unit = "m"
+        elif any(deriv_sym.startswith(p) for p in ("R_", "1HZ")):
             duration = 60
             duration_unit = "s"
         else:
-            duration = 5
+            duration = 15
             duration_unit = "m"
             
         self.log_activity(f"🤖 AUTO-SIGNAL TRIGGERED: {sig_type} on {symbol} with {confidence}% confidence. Executing...", "info")
@@ -654,6 +685,35 @@ class DerivAutoTrader:
             except Exception as e:
                 logger.error(f"Startup Deriv Auto-Connect failed: {e}")
 
+    async def fetch_deriv_candles(self, symbol: str, count: int = 100, granularity: int = 60) -> List[Dict[str, Any]]:
+        """Fetches real-time candles directly from Deriv WebSocket."""
+        if not self.ws or not self.is_connected:
+            return []
+        deriv_sym = self.map_symbol(symbol)
+        req = {
+            "ticks_history": deriv_sym,
+            "adjust_start_time": 1,
+            "count": count,
+            "end": "latest",
+            "style": "candles",
+            "granularity": granularity,
+        }
+        res = await self._send_request(req)
+        raw_candles = res.get("candles", [])
+        if not raw_candles:
+            return []
+        return [
+            {
+                "time": int(c.get("epoch")),
+                "open": float(c.get("open")),
+                "high": float(c.get("high")),
+                "low": float(c.get("low")),
+                "close": float(c.get("close")),
+                "volume": 1000.0,
+            }
+            for c in raw_candles
+        ]
+
     async def run_autonomous_scanner(self):
         """
         Autonomous Cloud Trading Engine:
@@ -671,9 +731,20 @@ class DerivAutoTrader:
                         if not self.is_auto_trading_enabled:
                             break
                         try:
-                            candles, _ = fetch_ohlcv_with_source(symbol=sym, interval="1m", limit=100)
+                            candles = None
+                            # Stream live candles directly from Deriv WebSocket if available
+                            if self.is_connected and self.ws:
+                                try:
+                                    candles = await self.fetch_deriv_candles(sym, count=100, granularity=60)
+                                except Exception:
+                                    candles = None
+                            
+                            if not candles or len(candles) < 30:
+                                candles, _ = fetch_ohlcv_with_source(symbol=sym, interval="1m", limit=100)
+
                             if not candles or len(candles) < 30:
                                 continue
+
                             ind = compute_all_indicators(
                                 candles, rsi_period=9, macd_fast=12, macd_slow=26, macd_signal=9, bb_period=20, bb_std=2.0
                             )
@@ -685,7 +756,7 @@ class DerivAutoTrader:
                                 asset_type=detect_asset_type(sym),
                                 engine_version="v4.1",
                                 symbol=sym,
-                                is_elite_mode=True,
+                                is_elite_mode=False,
                             )
                             curr_sig = sig_data.get("current", {})
                             if curr_sig.get("signal") in ("CALL", "PUT"):
