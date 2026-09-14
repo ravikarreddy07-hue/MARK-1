@@ -113,6 +113,7 @@ class DerivConfigRequest(BaseModel):
     max_daily_losses: Optional[int] = Field(None, ge=1, le=10000)
     max_concurrent_trades: Optional[int] = Field(None, ge=1, le=20)
     cooldown_seconds: Optional[int] = Field(None, ge=5, le=600)
+    allowed_market: Optional[str] = Field(None, pattern="^(all|forex|synthetics|metals)$")
     is_auto_trading_enabled: Optional[bool] = None
 
 class DerivManualTradeRequest(BaseModel):

@@ -106,6 +106,7 @@ class DerivAutoTrader:
             "max_daily_losses": 10000,       # Stop if we get N losses
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
+            "allowed_market": "all",          # "all", "forex", "synthetics", "metals"
         }
         
         # Runtime State & Performance
@@ -122,6 +123,18 @@ class DerivAutoTrader:
         self._running = False
         self._req_id = 1
         self._pending_requests: Dict[int, asyncio.Future] = {}
+
+    def get_asset_market_type(self, symbol: str) -> str:
+        """Determines market category of asset: 'synthetics', 'metals', or 'forex'."""
+        deriv_sym = self.map_symbol(symbol)
+        clean = symbol.upper().replace("/", "").replace("-", "")
+        if any(deriv_sym.startswith(p) for p in ("R_", "1HZ")):
+            return "synthetics"
+        elif "XAU" in deriv_sym or "XAG" in deriv_sym or clean in ("GOLD", "SILVER"):
+            return "metals"
+        elif deriv_sym.startswith("frx") or any(clean.startswith(fx) for fx in ("EUR", "GBP", "USD", "AUD", "NZD", "CAD", "CHF", "JPY")):
+            return "forex"
+        return "other"
 
     def log_activity(self, message: str, level: str = "info", data: Optional[Dict[str, Any]] = None):
         ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -580,6 +593,13 @@ class DerivAutoTrader:
         if confidence < min_conf:
             return None
             
+        # Allowed Market Mode Filter (All, Forex only, Synthetics only, Metals only)
+        allowed_market = str(self.config.get("allowed_market", "all")).lower()
+        if allowed_market != "all":
+            asset_market = self.get_asset_market_type(symbol)
+            if asset_market != allowed_market:
+                return None
+            
         # Risk Check: Daily Profit Target
         if self.daily_pnl >= float(self.config.get("take_profit_daily", 10.0)):
             self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f}) reached. Auto-trading paused.", "warning")
@@ -727,7 +747,12 @@ class DerivAutoTrader:
         while True:
             try:
                 if self.is_auto_trading_enabled and self.is_connected and self.is_authorized:
-                    for sym in AUTONOMOUS_WATCHLIST:
+                    allowed_m = str(self.config.get("allowed_market", "all")).lower()
+                    active_symbols = AUTONOMOUS_WATCHLIST
+                    if allowed_m != "all":
+                        active_symbols = [s for s in AUTONOMOUS_WATCHLIST if self.get_asset_market_type(s) == allowed_m]
+
+                    for sym in active_symbols:
                         if not self.is_auto_trading_enabled:
                             break
                         try:

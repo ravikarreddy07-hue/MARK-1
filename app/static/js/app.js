@@ -1090,17 +1090,24 @@ class BinaryApp {
 
         const maxTradesInput = document.getElementById("deriv-max-trades-input");
         const maxLossesInput = document.getElementById("deriv-max-losses-input");
+        const marketInput = document.getElementById("deriv-market-input");
 
-        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput].forEach((inp) => {
+        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput, marketInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
-                this.updateDerivConfig({
+                const updates = {
                     default_stake: parseFloat(stakeInput?.value || 1.0),
                     min_confidence: parseInt(confInput?.value || 80),
                     take_profit_daily: parseFloat(tpInput?.value || 10000.0),
                     stop_loss_daily: parseFloat(slInput?.value || 10000.0),
                     max_daily_trades: parseInt(maxTradesInput?.value || 10000),
                     max_daily_losses: parseInt(maxLossesInput?.value || 10000),
-                });
+                    allowed_market: marketInput?.value || "all",
+                };
+                this.updateDerivConfig(updates);
+                if (inp === marketInput && marketInput) {
+                    const label = marketInput.options[marketInput.selectedIndex]?.text || marketInput.value;
+                    this.showToast(`🎯 Bot Market restricted to: ${label}`, "win");
+                }
             });
         });
 
@@ -1254,6 +1261,8 @@ class BinaryApp {
                 if (slInp && document.activeElement !== slInp && data.config.stop_loss_daily !== undefined) slInp.value = data.config.stop_loss_daily;
                 if (maxTInp && document.activeElement !== maxTInp && data.config.max_daily_trades !== undefined) maxTInp.value = data.config.max_daily_trades;
                 if (maxLInp && document.activeElement !== maxLInp && data.config.max_daily_losses !== undefined) maxLInp.value = data.config.max_daily_losses;
+                const marketInp = document.getElementById("deriv-market-input");
+                if (marketInp && document.activeElement !== marketInp && data.config.allowed_market !== undefined) marketInp.value = data.config.allowed_market;
             }
 
             // Also refresh live trade table

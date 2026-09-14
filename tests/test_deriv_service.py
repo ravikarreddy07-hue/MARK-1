@@ -48,3 +48,21 @@ def test_deriv_disconnect_endpoint():
     res = client.post("/api/deriv/disconnect")
     assert res.status_code == 200
     assert res.json().get("success") is True
+
+
+def test_deriv_allowed_market_filter():
+    # Verify asset market categorization
+    assert deriv_trader.get_asset_market_type("EURUSD") == "forex"
+    assert deriv_trader.get_asset_market_type("GBPUSD") == "forex"
+    assert deriv_trader.get_asset_market_type("R_100") == "synthetics"
+    assert deriv_trader.get_asset_market_type("1HZ75V") == "synthetics"
+    assert deriv_trader.get_asset_market_type("GOLD") == "metals"
+    assert deriv_trader.get_asset_market_type("SILVER") == "metals"
+
+    # Test POST /api/deriv/config with allowed_market
+    res = client.post("/api/deriv/config", json={"allowed_market": "forex"})
+    assert res.status_code == 200
+    assert res.json()["config"]["allowed_market"] == "forex"
+
+    # Reset to all
+    client.post("/api/deriv/config", json={"allowed_market": "all"})
