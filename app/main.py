@@ -35,10 +35,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Auto-connects to Deriv on server startup and starts 24/7 autonomous cloud scanner and keepalive."""
     asyncio.create_task(deriv_trader.auto_connect_on_startup())
     asyncio.create_task(deriv_trader.run_autonomous_scanner())
-    asyncio.create_task(deriv_trader.run_cloud_keepalive())
 
 @app.get("/ping")
 @app.get("/api/health")
