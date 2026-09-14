@@ -74,12 +74,13 @@ ENGINE_PRESETS = {
     },
 }
 
-# ─── Elite 70% Sniper Whitelist (Proven High-Win-Rate Assets) ─────────────────
-ELITE_70_SYMBOLS = {
+# ─── Elite 80% Sniper Whitelist (Proven High-Win-Rate Assets) ─────────────────
+ELITE_80_SYMBOLS = {
     "USDCAD", "EURGBP", "GBPUSD", "EURUSD", "AUDUSD",
     "BTCUSDT", "ETHUSDT",
     "GOLD", "SILVER",
 }
+ELITE_70_SYMBOLS = ELITE_80_SYMBOLS  # backward compatibility alias
 
 # ─── Hard-coded learned weights from grid-search backtesting ─────────────────
 WEIGHT_RSI_EXTREME     = 4.0
@@ -161,8 +162,8 @@ def evaluate_candle_signal(
     t       = c["time"]
 
     # ── Elite Mode: Whitelist Gate ────────────────────────────────────────────
-    if is_elite_mode and symbol and symbol.upper() not in ELITE_70_SYMBOLS:
-        return _neutral(t, close_p, f"{symbol} outside Elite 70% Whitelist")
+    if is_elite_mode and symbol and symbol.upper() not in ELITE_80_SYMBOLS:
+        return _neutral(t, close_p, f"{symbol} outside Elite 80% Whitelist")
 
     # ── UPGRADE 1: Session filter (controlled by preset) ──────────────────────
     if p_session and not is_active_session(t, asset_type):
@@ -503,12 +504,12 @@ def evaluate_candle_signal(
             and bull_score >= bear_score + p_min_lead):
         confidence = min(96.0, round(p_conf_base + (bull_score / max_score) * p_conf_range, 1))
         
-        # In V4 Ultra or Elite 70% mode, block counter-trend trades against 200-EMA
+        # In V4 Ultra or Elite 80% mode, block counter-trend trades against 200-EMA
         if (p_require_mtf or is_elite_mode) and not mtf_bull_aligned:
             return _neutral(t, close_p, "Blocked by Macro Trend: Price is below 200-EMA downtrend (MTF alignment required)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         if is_elite_mode and confidence < min_elite_conf:
-            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+            return _neutral(t, close_p, f"Filtered by Elite 80% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         is_a_plus = confidence >= 80.0 and mtf_bull_aligned
         return {
@@ -530,12 +531,12 @@ def evaluate_candle_signal(
             and bear_score >= bull_score + p_min_lead):
         confidence = min(96.0, round(p_conf_base + (bear_score / max_score) * p_conf_range, 1))
 
-        # In V4 Ultra or Elite 70% mode, block counter-trend trades against 200-EMA
+        # In V4 Ultra or Elite 80% mode, block counter-trend trades against 200-EMA
         if (p_require_mtf or is_elite_mode) and not mtf_bear_aligned:
             return _neutral(t, close_p, "Blocked by Macro Trend: Price is above 200-EMA uptrend (MTF alignment required)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         if is_elite_mode and confidence < min_elite_conf:
-            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+            return _neutral(t, close_p, f"Filtered by Elite 80% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         is_a_plus = confidence >= 80.0 and mtf_bear_aligned
         return {
@@ -662,7 +663,7 @@ def generate_all_signals(
         if last_closed_sig.get("signal") in ("CALL", "PUT") and last_closed_sig.get("confidence", 0) >= min_confirm_conf:
             current_signal = dict(last_closed_sig)
             current_signal["status"] = "CONFIRMED"
-            current_signal["status_label"] = "🎯 ELITE A+ SETUP (70%+ Probability)" if current_signal.get("is_elite") else "🟢 Confirmed Setup (Closed Candle)"
+            current_signal["status_label"] = "🎯 ELITE A+ SETUP (80%+ Probability)" if current_signal.get("is_elite") else "🟢 Confirmed Setup (Closed Candle)"
             current_signal["is_confirmed"] = True
         elif forming_sig.get("signal") in ("CALL", "PUT"):
             current_signal = dict(forming_sig)
@@ -682,7 +683,7 @@ def generate_all_signals(
         "markers": markers,
         "history": history,
         "engine_version": engine_version,
-        "preset_label": "Elite 70% Sniper" if is_elite_mode else preset.get("label", engine_version),
+        "preset_label": "Elite 80% Sniper" if is_elite_mode else preset.get("label", engine_version),
         "is_elite_mode": is_elite_mode,
     }
 

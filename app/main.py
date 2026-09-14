@@ -140,7 +140,7 @@ def get_market_data(
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$", description="Engine preset (v4 or v4.1)"),
-    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
+    elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
     Returns OHLCV candlestick data, calculated technical indicators, and real-time confluence signals.
@@ -224,7 +224,7 @@ def get_signal_at_time(
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
-    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
+    elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
     Evaluates indicators and returns signal details for a specific historical point in time.
@@ -289,7 +289,7 @@ def get_backtest(
     bb_period: int = Query(20, ge=2, le=200),
     bb_std: float = Query(2.0, gt=0.1, le=10.0),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
-    elite_mode: bool = Query(False, description="Enable Elite 70% Sniper Mode"),
+    elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
     Executes historical backtest over live market data.
@@ -394,7 +394,7 @@ def get_scanner_signals(
     interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
     market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks, Synthetics, high_conf, elite_forex"),
     engine: str = Query("v4.1", pattern="^(v4|v4.1)$"),
-    elite_mode: bool = Query(False, description="Filter to Elite 70% Whitelist and Grade A+ Setups (>=80% conf)"),
+    elite_mode: bool = Query(False, description="Filter to Elite 80% Whitelist and Grade A+ Setups (>=80% conf)"),
 ):
     """
     Live Multi-Chart Signal Scanner: Evaluates live signals across all market charts simultaneously.

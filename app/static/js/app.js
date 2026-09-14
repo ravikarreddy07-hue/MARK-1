@@ -194,7 +194,7 @@ class BinaryApp {
         if (!btn || !badge) return;
         if (this.eliteMode) {
             btn.classList.add("active");
-            badge.textContent = "ON (70%+)";
+            badge.textContent = "ON (80%+)";
             badge.className = "elite-badge on";
         } else {
             btn.classList.remove("active");
@@ -208,8 +208,8 @@ class BinaryApp {
         localStorage.setItem("qb_elite_mode", this.eliteMode ? "true" : "false");
         this.updateEliteSniperUI();
         if (this.eliteMode) {
-            this.showToast("🎯 Option B: Elite 70% Sniper Mode ACTIVATED (Macro MTF + 80%+ Conf Gate)", "win");
-            this.updateDerivConfig({ min_confidence: 80 });
+            this.showToast("🎯 Option B: Elite 80% Sniper Mode ACTIVATED (Macro MTF + 80%+ Conf Gate)", "win");
+            this.updateDerivConfig({ min_confidence: 85 });
         } else {
             this.showToast("Elite Sniper Mode Deactivated. Returned to Standard Filters.", "info");
         }
