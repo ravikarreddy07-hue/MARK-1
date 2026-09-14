@@ -122,7 +122,7 @@ class BinaryApp {
         this.activeTrade = null;
 
         this.settings = this.loadSettings();
-        this.engineVersion = "v4.1";
+        this.engineVersion = "v4";
         this.eliteMode = localStorage.getItem("qb_elite_mode") === "true";
         this.streamFilter = "all";
         this.streamData = [];
@@ -1102,22 +1102,32 @@ class BinaryApp {
         const maxTradesInput = document.getElementById("deriv-max-trades-input");
         const maxLossesInput = document.getElementById("deriv-max-losses-input");
         const marketInput = document.getElementById("deriv-market-input");
+        const engineInput = document.getElementById("deriv-engine-input");
 
-        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput, marketInput].forEach((inp) => {
+        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput, marketInput, engineInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
+                const selectedEngine = engineInput?.value || "v4";
+                this.engineVersion = selectedEngine;
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 1.0),
-                    min_confidence: parseInt(confInput?.value || 80),
+                    min_confidence: parseInt(confInput?.value || 85),
                     take_profit_daily: parseFloat(tpInput?.value || 10000.0),
                     stop_loss_daily: parseFloat(slInput?.value || 10000.0),
                     max_daily_trades: parseInt(maxTradesInput?.value || 10000),
                     max_daily_losses: parseInt(maxLossesInput?.value || 10000),
-                    allowed_market: marketInput?.value || "all",
+                    allowed_market: marketInput?.value || "forex",
+                    engine_version: selectedEngine,
                 };
                 this.updateDerivConfig(updates);
                 if (inp === marketInput && marketInput) {
                     const label = marketInput.options[marketInput.selectedIndex]?.text || marketInput.value;
                     this.showToast(`🎯 Bot Market restricted to: ${label}`, "win");
+                }
+                if (inp === engineInput && engineInput) {
+                    const label = engineInput.options[engineInput.selectedIndex]?.text || engineInput.value;
+                    this.showToast(`⚡ Bot Engine Mode switched to: ${label}`, "win");
+                    this.loadMarketData();
+                    this.loadSignalsStream();
                 }
             });
         });
@@ -1274,6 +1284,11 @@ class BinaryApp {
                 if (maxLInp && document.activeElement !== maxLInp && data.config.max_daily_losses !== undefined) maxLInp.value = data.config.max_daily_losses;
                 const marketInp = document.getElementById("deriv-market-input");
                 if (marketInp && document.activeElement !== marketInp && data.config.allowed_market !== undefined) marketInp.value = data.config.allowed_market;
+                const engineInp = document.getElementById("deriv-engine-input");
+                if (engineInp && document.activeElement !== engineInp && data.config.engine_version !== undefined) {
+                    engineInp.value = data.config.engine_version;
+                    this.engineVersion = data.config.engine_version;
+                }
             }
 
             // Render live activity feed

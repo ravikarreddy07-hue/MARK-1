@@ -66,3 +66,12 @@ def test_deriv_allowed_market_filter():
 
     # Reset to all
     client.post("/api/deriv/config", json={"allowed_market": "all"})
+
+def test_v4_ultra_config_and_mtf_gate():
+    # Test POST /api/deriv/config with engine_version and min_confidence 85
+    res = client.post("/api/deriv/config", json={"engine_version": "v4", "min_confidence": 85})
+    assert res.status_code == 200
+    cfg = res.json()["config"]
+    assert cfg["engine_version"] == "v4"
+    assert cfg["min_confidence"] == 85
+

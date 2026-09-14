@@ -112,6 +112,7 @@ class DerivConfigRequest(BaseModel):
     max_concurrent_trades: Optional[int] = Field(None, ge=1, le=20)
     cooldown_seconds: Optional[int] = Field(None, ge=5, le=600)
     allowed_market: Optional[str] = Field(None, pattern="^(all|forex|synthetics|metals)$")
+    engine_version: Optional[str] = Field(None, pattern="^(v4|v4.1)$")
     is_auto_trading_enabled: Optional[bool] = None
 
 class DerivManualTradeRequest(BaseModel):
@@ -440,7 +441,7 @@ def get_scanner_signals(
 
             # Auto-execute trade on Deriv if enabled and signal meets confidence criteria
             if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT"):
-                min_conf = float(deriv_trader.config.get("min_confidence", 80))
+                min_conf = float(deriv_trader.config.get("min_confidence", 85))
                 if conf >= min_conf:
                     try:
                         loop = asyncio.get_event_loop()

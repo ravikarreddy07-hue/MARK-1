@@ -199,7 +199,7 @@
                                 </div>
                                 <div class="input-wrap">
                                     <label>Min Conf (%)</label>
-                                    <input type="number" id="deriv-conf-input" class="custom-input" value="80" min="60" max="95" step="5">
+                                    <input type="number" id="deriv-conf-input" class="custom-input" value="85" min="60" max="95" step="5">
                                 </div>
                                 <div class="input-wrap">
                                     <label>Max Trades/Day (N)</label>
@@ -220,10 +220,17 @@
                                 <div class="input-wrap" style="grid-column: span 2;">
                                     <label style="color: #ffd700; font-weight: 700;">🎯 Market Mode</label>
                                     <select id="deriv-market-input" class="custom-input" style="font-size: 11px; padding: 4px 6px; border-color: rgba(255, 215, 0, 0.4); color: #ffd700; background: #0b0f19;">
+                                        <option value="forex" selected>💱 Forex Only (EUR, GBP, USD pairs)</option>
                                         <option value="all">🌐 All Markets (Forex + Synthetics + Metals)</option>
-                                        <option value="forex">💱 Forex Only (EUR, GBP, USD pairs)</option>
                                         <option value="synthetics">⚡ Synthetics Only (24/7 Volatility)</option>
                                         <option value="metals">🥇 Metals Only (Gold &amp; Silver)</option>
+                                    </select>
+                                </div>
+                                <div class="input-wrap" style="grid-column: span 2;">
+                                    <label style="color: #60a5fa; font-weight: 700;">⚡ Signal Engine Mode</label>
+                                    <select id="deriv-engine-input" class="custom-input" style="font-size: 11px; padding: 4px 6px; border-color: rgba(96, 165, 250, 0.4); color: #60a5fa; background: #0b0f19;">
+                                        <option value="v4" selected>🛡️ V4 Ultra (Highest Win Rate / 5-Pillars + 200 EMA Hard Gate)</option>
+                                        <option value="v4.1">⚖️ V4.1 Balanced (4-Pillars / Standard Signals)</option>
                                     </select>
                                 </div>
                             </div>

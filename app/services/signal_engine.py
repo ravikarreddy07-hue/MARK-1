@@ -53,6 +53,7 @@ ENGINE_PRESETS = {
         "pillars_required":     5,
         "two_candle_confirm": True,
         "session_filter":     True,
+        "require_mtf":        True,
         "confidence_base":    70.0,
         "confidence_range":   26.0,
         "label": "V4 Ultra (Rare / Highest Accuracy)",
@@ -132,6 +133,7 @@ def evaluate_candle_signal(
     p_adx_min       = preset.get("adx_min",           ADX_MIN_TREND)
     p_pillars       = preset.get("pillars_required",  4)
     p_session       = preset.get("session_filter",    True)
+    p_require_mtf   = preset.get("require_mtf",       False)
     p_conf_base     = preset.get("confidence_base",   68.0)
     p_conf_range    = preset.get("confidence_range",  28.0)
 
@@ -501,9 +503,12 @@ def evaluate_candle_signal(
             and bull_score >= bear_score + p_min_lead):
         confidence = min(96.0, round(p_conf_base + (bull_score / max_score) * p_conf_range, 1))
         
-        # In Elite 70% mode, block counter-trend trades and require Grade A+ (>=80% conf)
-        if is_elite_mode and (confidence < min_elite_conf or not mtf_bull_aligned):
-            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}%, MTF: {mtf_bull_aligned})", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+        # In V4 Ultra or Elite 70% mode, block counter-trend trades against 200-EMA
+        if (p_require_mtf or is_elite_mode) and not mtf_bull_aligned:
+            return _neutral(t, close_p, "Blocked by Macro Trend: Price is below 200-EMA downtrend (MTF alignment required)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+
+        if is_elite_mode and confidence < min_elite_conf:
+            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         is_a_plus = confidence >= 80.0 and mtf_bull_aligned
         return {
@@ -525,9 +530,12 @@ def evaluate_candle_signal(
             and bear_score >= bull_score + p_min_lead):
         confidence = min(96.0, round(p_conf_base + (bear_score / max_score) * p_conf_range, 1))
 
-        # In Elite 70% mode, block counter-trend trades and require Grade A+ (>=80% conf)
-        if is_elite_mode and (confidence < min_elite_conf or not mtf_bear_aligned):
-            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}%, MTF: {mtf_bear_aligned})", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+        # In V4 Ultra or Elite 70% mode, block counter-trend trades against 200-EMA
+        if (p_require_mtf or is_elite_mode) and not mtf_bear_aligned:
+            return _neutral(t, close_p, "Blocked by Macro Trend: Price is above 200-EMA uptrend (MTF alignment required)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
+
+        if is_elite_mode and confidence < min_elite_conf:
+            return _neutral(t, close_p, f"Filtered by Elite 70% rules (Conf: {confidence}% < {min_elite_conf}%)", suggested_time=suggested_time, suggested_secs=suggested_secs, suggested_label=suggested_label)
 
         is_a_plus = confidence >= 80.0 and mtf_bear_aligned
         return {

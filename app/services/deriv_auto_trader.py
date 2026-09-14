@@ -97,7 +97,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 1.0,
-            "min_confidence": 80,
+            "min_confidence": 85,
             "preferred_duration": 5,
             "duration_unit": "m",
             "take_profit_daily": 10000.0,
@@ -106,7 +106,8 @@ class DerivAutoTrader:
             "max_daily_losses": 10000,       # Stop if we get N losses
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
-            "allowed_market": "all",          # "all", "forex", "synthetics", "metals"
+            "allowed_market": "forex",       # "all", "forex", "synthetics", "metals"
+            "engine_version": "v4",          # "v4" (Ultra 5-pillar + 200 EMA gate) or "v4.1"
         }
         
         # Runtime State & Performance
@@ -589,7 +590,7 @@ class DerivAutoTrader:
             return None
             
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 80))
+        min_conf = float(self.config.get("min_confidence", 85))
         if confidence < min_conf:
             return None
             
@@ -765,13 +766,14 @@ class DerivAutoTrader:
                             ind = compute_all_indicators(
                                 candles, rsi_period=9, macd_fast=12, macd_slow=26, macd_signal=9, bb_period=20, bb_std=2.0
                             )
+                            engine_ver = str(self.config.get("engine_version", "v4")).lower()
                             sig_data = generate_all_signals(
                                 candles,
                                 ind,
                                 rsi_oversold=28.0,
                                 rsi_overbought=72.0,
                                 asset_type=detect_asset_type(sym),
-                                engine_version="v4.1",
+                                engine_version=engine_ver,
                                 symbol=sym,
                                 is_elite_mode=False,
                             )
