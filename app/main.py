@@ -386,6 +386,8 @@ SCANNER_WATCHLIST = [
     {"symbol": "1HZ10V",  "market": "Synthetics", "name": "Vol 10 (1s) Index", "tvSymbol": "DERIV:1HZ10V"},
 ]
 
+_SCANNER_CACHE: Dict[str, Any] = {}
+
 
 @app.get("/api/scanner/signals")
 def get_scanner_signals(
@@ -398,6 +400,12 @@ def get_scanner_signals(
     Live Multi-Chart Signal Scanner: Evaluates live signals across all market charts simultaneously.
     Supports high-confidence setups and market categories.
     """
+    cache_key = f"{interval}_{market_filter}_{engine}_{elite_mode}"
+    cached = _SCANNER_CACHE.get(cache_key)
+    now = time.time()
+    if cached and (now - cached["cached_at"] < 4.0):
+        return cached["payload"]
+
     is_elite = elite_mode or (bool(market_filter) and market_filter.lower() in ("high_conf", "elite_forex"))
     
     items_to_scan = SCANNER_WATCHLIST
@@ -477,13 +485,15 @@ def get_scanner_signals(
 
     # Sort so high-confidence actionable setups appear first
     results.sort(key=lambda x: (x["signal"] in ("CALL", "PUT"), x["confidence"]), reverse=True)
-    return {
+    payload = {
         "timestamp": int(time.time()),
         "interval": interval,
         "count": len(results),
         "signals": results,
         "is_elite_mode": is_elite,
     }
+    _SCANNER_CACHE[cache_key] = {"cached_at": now, "payload": payload}
+    return payload
 
 
 @app.get("/api/optimize")
