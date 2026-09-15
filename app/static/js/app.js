@@ -122,7 +122,7 @@ class BinaryApp {
         this.activeTrade = null;
 
         this.settings = this.loadSettings();
-        this.engineVersion = "v4";
+        this.engineVersion = "v5_sniper";
         this.eliteMode = localStorage.getItem("qb_elite_mode") === "true";
         this.streamFilter = "all";
         this.streamData = [];
@@ -1106,11 +1106,11 @@ class BinaryApp {
 
         [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput, marketInput, engineInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
-                const selectedEngine = engineInput?.value || "v4";
+                const selectedEngine = engineInput?.value || "v5_sniper";
                 this.engineVersion = selectedEngine;
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 1.0),
-                    min_confidence: parseInt(confInput?.value || 85),
+                    min_confidence: parseInt(confInput?.value || 75),
                     take_profit_daily: parseFloat(tpInput?.value || 10000.0),
                     stop_loss_daily: parseFloat(slInput?.value || 10000.0),
                     max_daily_trades: parseInt(maxTradesInput?.value || 10000),
