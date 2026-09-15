@@ -62,11 +62,13 @@ DERIV_SYMBOL_MAP = {
     "1HZ10V": "1HZ10V",
 }
 
-# Watchlist for 24/7 Autonomous Cloud Scanner
+# Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
+BLACKLISTED_SYMBOLS = {"GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD"}
+
+# Whitelist for 24/7 Autonomous Cloud Scanner (>70% Win Rate Pairs Only)
 AUTONOMOUS_WATCHLIST = [
-    # Top >70% Win-Rate Forex Pairs (Analyzed on 5m candles with 15m Deriv contracts)
-    "USDJPY", "USDCHF", "EURGBP", "EURUSD", "USDCAD", "GBPUSD", "AUDUSD", "NZDUSD",
-    "EURJPY", "GBPJPY", "AUDJPY", "EURAUD", "GBPAUD",
+    # Top >70% Win-Rate Forex Pairs (Verified on live Deriv 5m candles -> 15m contracts)
+    "USDJPY", "USDCHF", "EURGBP", "GBPAUD", "EURUSD", "GBPUSD", "NZDUSD",
     # Commodities / Metals
     "GOLD", "SILVER",
     # Synthetic Volatility Indices (24/7 Active)
@@ -590,8 +592,13 @@ class DerivAutoTrader:
         if sig_type not in ("CALL", "PUT"):
             return None
             
+        # Safeguard: Block blacklisted high-risk trend pairs (sub-50% win rate protection)
+        clean_sym = symbol.upper().replace("/", "").replace("-", "")
+        if clean_sym in BLACKLISTED_SYMBOLS:
+            return None
+
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 85))
+        min_conf = float(self.config.get("min_confidence", 75))
         if confidence < min_conf:
             return None
             
@@ -753,6 +760,7 @@ class DerivAutoTrader:
                     active_symbols = AUTONOMOUS_WATCHLIST
                     if allowed_m != "all":
                         active_symbols = [s for s in AUTONOMOUS_WATCHLIST if self.get_asset_market_type(s) == allowed_m]
+                    active_symbols = [s for s in active_symbols if s not in BLACKLISTED_SYMBOLS]
 
                     for sym in active_symbols:
                         if not self.is_auto_trading_enabled:
