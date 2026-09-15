@@ -788,6 +788,31 @@ class DerivAutoTrader:
                 
             await asyncio.sleep(25)
 
+    async def run_cloud_keepalive(self):
+        """
+        Autonomous Cloud Keepalive:
+        Pings the public /ping endpoint every 7 minutes to guarantee Render's
+        free-tier 15-minute inactivity idle timer never puts the server to sleep.
+        """
+        render_url = os.getenv("RENDER_EXTERNAL_URL", "https://quantum-binary-terminal.onrender.com").rstrip("/")
+        ping_endpoint = f"{render_url}/ping"
+        logger.info(f"Cloud keepalive worker initialized (target: {ping_endpoint}, interval: 7 min)")
+        await asyncio.sleep(45)
+
+        while True:
+            try:
+                def _do_ping():
+                    return requests.get(ping_endpoint, timeout=15)
+
+                resp = await asyncio.to_thread(_do_ping)
+                if resp.status_code == 200:
+                    logger.debug("Cloud keepalive heartbeat sent successfully (7-min cycle).")
+            except Exception as e:
+                logger.debug(f"Cloud keepalive heartbeat notice: {e}")
+
+            # Sleep 7 minutes (420s) to keep server always active
+            await asyncio.sleep(420)
+
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
         return {
