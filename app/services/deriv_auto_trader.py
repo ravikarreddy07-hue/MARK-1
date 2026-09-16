@@ -107,7 +107,7 @@ class DerivAutoTrader:
             "stop_loss_daily": 10000.0,
             "max_daily_trades": 10000,       # Take N number of trades per day
             "max_daily_losses": 10000,       # Stop if we get N losses
-            "max_concurrent_trades": 3,
+            "max_concurrent_trades": 5,
             "cooldown_seconds": 60,
             "allowed_market": "forex",       # "all", "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
@@ -743,6 +743,45 @@ class DerivAutoTrader:
             for c in raw_candles
         ]
 
+    async def reconcile_active_contracts(self):
+        """
+        Actively checks and settles any expired contracts in self.active_contracts.
+        Guarantees contracts never get stuck in memory and block new trades.
+        """
+        if not self.active_contracts or not self.ws or not self.is_connected:
+            return
+            
+        now = time.time()
+        for cid, trade in list(self.active_contracts.items()):
+            start = trade.get("start_time", now)
+            dur_str = str(trade.get("duration", "15m"))
+            dur_secs = 900
+            try:
+                num = int("".join(filter(str.isdigit, dur_str)) or "15")
+                if "s" in dur_str:
+                    dur_secs = num
+                elif "m" in dur_str:
+                    dur_secs = num * 60
+                elif "h" in dur_str:
+                    dur_secs = num * 3600
+            except Exception:
+                dur_secs = 900
+
+            # If contract is past expiry plus 10s grace period, query Deriv directly
+            if now > (start + dur_secs + 10):
+                try:
+                    res = await self._send_request({"proposal_open_contract": 1, "contract_id": int(cid)}, timeout=2.5)
+                    poc = res.get("proposal_open_contract", {})
+                    if poc and (bool(poc.get("is_sold")) or bool(poc.get("is_expired")) or poc.get("status") in ("won", "lost")):
+                        self._handle_open_contract_update(poc)
+                    elif not poc or now > (start + dur_secs * 2):
+                        # Force remove stale contract so it never locks the bot
+                        self.active_contracts.pop(cid, None)
+                except Exception as e:
+                    logger.debug(f"Error reconciling contract #{cid}: {e}")
+                    if now > (start + dur_secs * 2):
+                        self.active_contracts.pop(cid, None)
+
     async def run_autonomous_scanner(self):
         """
         Autonomous Cloud Trading Engine:
@@ -756,6 +795,9 @@ class DerivAutoTrader:
         while True:
             try:
                 if self.is_auto_trading_enabled and self.is_connected and self.is_authorized:
+                    # Clean up and settle any finished contracts
+                    await self.reconcile_active_contracts()
+
                     allowed_m = str(self.config.get("allowed_market", "all")).lower()
                     active_symbols = AUTONOMOUS_WATCHLIST
                     if allowed_m != "all":
