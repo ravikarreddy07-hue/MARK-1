@@ -641,14 +641,19 @@ class DerivAutoTrader:
         if time.time() - last_trade_time < cooldown_period:
             return None
             
-        # Max concurrent open trades check
-        if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 3)):
+        # Max concurrent open trades check across entire portfolio
+        if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 5)):
             return None
             
         # Check if asset is supported for binary options
         deriv_sym = self.map_symbol(symbol)
         if deriv_sym.startswith("cry"):
             return None
+
+        # Risk Protection: Max 1 active contract per pair at any time (prevents clustered exposure)
+        for cid, trade in self.active_contracts.items():
+            if trade.get("symbol") == symbol or trade.get("deriv_symbol") == deriv_sym:
+                return None
 
         # Standardize duration for Deriv API:
         # Forex requires >= 15m; Gold/Silver accepts 5m; Synthetics accept 60s
