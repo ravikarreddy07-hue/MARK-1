@@ -37,7 +37,6 @@ app.add_middleware(
 async def startup_event():
     asyncio.create_task(deriv_trader.auto_connect_on_startup())
     asyncio.create_task(deriv_trader.run_autonomous_scanner())
-    asyncio.create_task(deriv_trader.run_cloud_keepalive())
 
 @app.get("/ping")
 @app.get("/api/health")
