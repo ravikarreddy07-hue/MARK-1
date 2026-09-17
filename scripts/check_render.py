@@ -2,12 +2,12 @@ import requests
 import time
 import sys
 
-RENDER_API_KEY = "rnd_j5PQcZ83syCgSSufQnEkM1UReGSU"
+RENDER_API_KEY = "rnd_URapoC1OZJwb9fZvPHvpOLDGFS3H"
 headers = {
     "Authorization": f"Bearer {RENDER_API_KEY}",
     "Accept": "application/json"
 }
-service_id = "srv-da8kc73bc2fs73ahg6gg"
+service_id = "srv-dam0l5ajnfac73csb9a0"
 
 for i in range(20):
     r_deploys = requests.get(f"https://api.render.com/v1/services/{service_id}/deploys", headers=headers)
