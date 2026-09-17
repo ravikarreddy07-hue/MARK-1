@@ -38,8 +38,8 @@ async def startup_event():
     asyncio.create_task(deriv_trader.auto_connect_on_startup())
     asyncio.create_task(deriv_trader.run_autonomous_scanner())
 
-@app.get("/ping")
-@app.get("/api/health")
+@app.api_route("/ping", methods=["GET", "HEAD"])
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health_check():
     """Lightweight keep-alive endpoint for UptimeRobot monitoring and cloud health status."""
     return {
@@ -620,7 +620,7 @@ static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def serve_index():
     index_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if os.path.exists(index_file):
