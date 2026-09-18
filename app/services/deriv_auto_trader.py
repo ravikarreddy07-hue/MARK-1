@@ -100,7 +100,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 1.0,
-            "min_confidence": 75,
+            "min_confidence": 80,
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 10000.0,

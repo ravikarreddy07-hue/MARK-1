@@ -441,7 +441,7 @@ def get_scanner_signals(
 
             # Auto-execute trade on Deriv if enabled and signal meets confidence criteria
             if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT"):
-                min_conf = float(deriv_trader.config.get("min_confidence", 85))
+                min_conf = float(deriv_trader.config.get("min_confidence", 80))
                 if conf >= min_conf:
                     try:
                         loop = asyncio.get_event_loop()
