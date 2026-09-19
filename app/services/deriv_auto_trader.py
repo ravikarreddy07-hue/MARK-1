@@ -112,7 +112,7 @@ class DerivAutoTrader:
             "max_daily_losses": 10000,       # Stop if we get N losses
             "max_concurrent_trades": 5,
             "cooldown_seconds": 60,
-            "allowed_market": "forex",       # "all", "forex", "synthetics", "metals"
+            "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
         }
         
