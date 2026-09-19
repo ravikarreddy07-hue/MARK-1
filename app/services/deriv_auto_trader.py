@@ -486,8 +486,8 @@ class DerivAutoTrader:
                 trade_duration = 15
                 trade_unit = "m"
         elif any(deriv_symbol.startswith(p) for p in ("R_", "1HZ")):
-            trade_duration = 60
-            trade_unit = "s"
+            trade_duration = 2
+            trade_unit = "m"
         else:
             trade_duration = int(duration or 15)
             trade_unit = str(duration_unit or "m")
@@ -515,7 +515,7 @@ class DerivAutoTrader:
         if "error" in proposal_res:
             err_msg = proposal_res["error"].get("message", "Proposal request rejected by Deriv")
             # If rejected due to duration, automatically retry with Deriv standard:
-            # Commodities: 5m | Forex: 15m | Synthetics: 60s
+            # Commodities: 5m | Forex: 15m | Synthetics: 2m
             if "duration" in err_msg.lower():
                 if "XAU" in deriv_symbol or "XAG" in deriv_symbol:
                     alt_duration = 5
@@ -524,8 +524,8 @@ class DerivAutoTrader:
                     alt_duration = 15
                     alt_unit = "m"
                 else:
-                    alt_duration = 60
-                    alt_unit = "s"
+                    alt_duration = 2
+                    alt_unit = "m"
                 self.log_activity(f"Retrying proposal for {deriv_symbol} with standard {alt_duration}{alt_unit} duration...", "info")
                 proposal_req["duration"] = alt_duration
                 proposal_req["duration_unit"] = alt_unit
@@ -704,7 +704,7 @@ class DerivAutoTrader:
                 return None
 
         # Standardize duration for Deriv API:
-        # Forex requires >= 15m; Gold/Silver accepts 5m; Synthetics accept 60s
+        # Forex requires >= 15m; Gold/Silver accepts 5m; Synthetics accept 2m
         if deriv_sym.startswith("frx"):
             if "XAU" in deriv_sym or "XAG" in deriv_sym:
                 duration = 5
@@ -713,8 +713,8 @@ class DerivAutoTrader:
                 duration = 15
                 duration_unit = "m"
         elif any(deriv_sym.startswith(p) for p in ("R_", "1HZ")):
-            duration = 60
-            duration_unit = "s"
+            duration = 2
+            duration_unit = "m"
         else:
             duration = 15
             duration_unit = "m"
