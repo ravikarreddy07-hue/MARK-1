@@ -294,8 +294,8 @@ class DerivAutoTrader:
                     "fullname": None,
                 }
                 
-                # Connect WebSocket using OTP URL
-                self.ws = await websockets.connect(ws_url, ping_interval=30, ping_timeout=10)
+                # Connect WebSocket using OTP URL with resilient 25s handshake timeout
+                self.ws = await websockets.connect(ws_url, open_timeout=25, ping_interval=30, ping_timeout=10)
                 self.is_connected = True
                 self.is_authorized = True
                 
@@ -333,7 +333,7 @@ class DerivAutoTrader:
                 self.is_pat_api = False
                 legacy_url = f"wss://ws.derivws.com/websockets/v3?app_id={clean_app_id if clean_app_id.isdigit() else 1089}"
                 self.log_activity(f"Connecting to Deriv WebSocket API ({legacy_url})...", "info")
-                self.ws = await websockets.connect(legacy_url, ping_interval=30, ping_timeout=10)
+                self.ws = await websockets.connect(legacy_url, open_timeout=25, ping_interval=30, ping_timeout=10)
                 self.is_connected = True
                 
                 if self._ws_task and not self._ws_task.done():
