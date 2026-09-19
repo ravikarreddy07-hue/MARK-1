@@ -112,7 +112,7 @@ class DerivConfigRequest(BaseModel):
     max_concurrent_trades: Optional[int] = Field(None, ge=1, le=20)
     cooldown_seconds: Optional[int] = Field(None, ge=5, le=600)
     allowed_market: Optional[str] = Field(None, pattern="^(all|forex|synthetics|metals)$")
-    engine_version: Optional[str] = Field(None, pattern="^(v4|v4.1)$")
+    engine_version: Optional[str] = Field(None, pattern="^(v4|v4.1|v5|v5_sniper)$")
     is_auto_trading_enabled: Optional[bool] = None
 
 class DerivManualTradeRequest(BaseModel):
@@ -247,7 +247,7 @@ def get_signal_at_time(
 
     idx = len(candles) - 1
     asset_type = detect_asset_type(symbol)
-    preset = ENGINE_PRESETS.get(engine.lower(), ENGINE_PRESETS["v4.1"])
+    preset = ENGINE_PRESETS.get(engine.lower(), ENGINE_PRESETS["v5_sniper"])
     sig_info = evaluate_candle_signal(
         idx=idx,
         candles=candles,

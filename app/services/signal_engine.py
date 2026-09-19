@@ -140,7 +140,7 @@ def evaluate_candle_signal(
     """
     # Resolve preset settings
     if preset is None:
-        preset = ENGINE_PRESETS.get("v4.1", {})
+        preset = ENGINE_PRESETS.get("v5_sniper", {})
     p_min_bull      = preset.get("min_bull_score",    MIN_BULL_SCORE)
     p_min_bear      = preset.get("min_bear_score",    MIN_BEAR_SCORE)
     p_min_lead      = preset.get("min_lead",          MIN_LEAD)
@@ -592,7 +592,7 @@ def generate_all_signals(
     rsi_oversold: float = 28.0,
     rsi_overbought: float = 72.0,
     asset_type: str = "forex",
-    engine_version: str = "v4.1",
+    engine_version: str = "v5_sniper",
     preset: Optional[Dict[str, Any]] = None,
     symbol: str = "",
     is_elite_mode: bool = False,
@@ -605,7 +605,7 @@ def generate_all_signals(
         return {"current": None, "markers": [], "history": [], "engine_version": engine_version, "is_elite_mode": is_elite_mode}
 
     if preset is None:
-        preset = ENGINE_PRESETS.get(str(engine_version).lower(), ENGINE_PRESETS["v4.1"])
+        preset = ENGINE_PRESETS.get(str(engine_version).lower(), ENGINE_PRESETS["v5_sniper"])
 
     raw = indicator_data["raw"]
     raw_history = []
