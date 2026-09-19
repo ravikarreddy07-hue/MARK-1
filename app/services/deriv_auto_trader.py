@@ -143,6 +143,41 @@ class DerivAutoTrader:
             return "forex"
         return "other"
 
+    def is_market_open_for_asset(self, symbol: str) -> bool:
+        """
+        Checks if the global market is open for trading the given asset:
+        - Synthetics (Volatility indices): 24/7/365 (always open).
+        - Crypto: 24/7/365.
+        - Forex: Open Sunday 21:00 UTC through Friday 21:00 UTC (Closed weekends).
+        - Metals (Gold/Silver): Open Sunday 22:00 UTC through Friday 21:00 UTC (Closed weekends).
+        """
+        mtype = self.get_asset_market_type(symbol)
+        if mtype in ("synthetics", "crypto"):
+            return True
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        weekday = now_utc.weekday()  # Monday=0, ... Friday=4, Saturday=5, Sunday=6
+        hour_float = now_utc.hour + now_utc.minute / 60.0
+
+        # Saturday: completely closed
+        if weekday == 5:
+            return False
+
+        # Friday: closes at 21:00 UTC (5:00 PM EST)
+        if weekday == 4 and hour_float >= 21.0:
+            return False
+
+        # Sunday: opens at 21:00 UTC for Forex (22:00 UTC for Metals)
+        open_hour = 22.0 if mtype == "metals" else 21.0
+        if weekday == 6 and hour_float < open_hour:
+            return False
+
+        return True
+
+    def is_forex_market_open(self) -> bool:
+        """Helper checking if the Forex market is currently open."""
+        return self.is_market_open_for_asset("EURUSD")
+
     def log_activity(self, message: str, level: str = "info", data: Optional[Dict[str, Any]] = None):
         ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
         ist_now = datetime.datetime.now(ist_tz)
@@ -432,6 +467,12 @@ class DerivAutoTrader:
             self.log_activity(err_msg, "warning")
             return {"success": False, "error": err_msg}
 
+        # Market Open Safeguard: Block trade execution if market is closed (e.g. Forex/Metals on weekends)
+        if not self.is_market_open_for_asset(symbol):
+            err_msg = f"Market for {symbol} is currently closed for the weekend (Re-opens Sunday 21:00 UTC)."
+            self.log_activity(f"⏸️ Cannot trade {symbol}: Market closed for the weekend.", "warning")
+            return {"success": False, "error": err_msg}
+
         contract_type = "CALL" if signal_type.upper() == "CALL" else "PUT"
         trade_stake = float(stake or self.config.get("default_stake", 1.0))
         
@@ -611,6 +652,10 @@ class DerivAutoTrader:
             asset_market = self.get_asset_market_type(symbol)
             if asset_market != allowed_market:
                 return None
+
+        # Market Open Safeguard: Block trade if market is closed (e.g. Forex/Metals on weekends)
+        if not self.is_market_open_for_asset(symbol):
+            return None
             
         # Risk Check: Daily Profit Target
         if self.daily_pnl >= float(self.config.get("take_profit_daily", 10.0)):
@@ -812,7 +857,18 @@ class DerivAutoTrader:
                         active_symbols = [s for s in AUTONOMOUS_WATCHLIST if self.get_asset_market_type(s) == allowed_m]
                     active_symbols = [s for s in active_symbols if s not in BLACKLISTED_SYMBOLS]
 
-                    for sym in active_symbols:
+                    # Filter out symbols whose market is closed (e.g. Forex/Metals on weekends)
+                    open_symbols = [s for s in active_symbols if self.is_market_open_for_asset(s)]
+
+                    if not open_symbols:
+                        now_time = time.time()
+                        if now_time - getattr(self, "_last_market_closed_log", 0) > 1800:
+                            self._last_market_closed_log = now_time
+                            self.log_activity("⏸️ Forex & Metals markets are closed for the weekend (Re-opens Sunday 21:00 UTC / 02:30 AM IST). Auto-scanner paused.", "info")
+                        await asyncio.sleep(60)
+                        continue
+
+                    for sym in open_symbols:
                         if not self.is_auto_trading_enabled:
                             break
                         try:
@@ -903,6 +959,7 @@ class DerivAutoTrader:
                 "active_contracts_count": len(self.active_contracts),
             },
             "active_contracts": list(self.active_contracts.values()),
+            "is_forex_market_open": self.is_forex_market_open(),
             "recent_activity": self.activity_log[:20],
         }
 

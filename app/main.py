@@ -51,6 +51,7 @@ def health_check():
         "account": deriv_trader.account_info.get("loginid"),
         "balance": deriv_trader.account_info.get("balance"),
         "active_contracts": len(deriv_trader.active_contracts),
+        "is_forex_market_open": deriv_trader.is_forex_market_open(),
     }
 
 class TradeCreateRequest(BaseModel):
@@ -439,8 +440,8 @@ def get_scanner_signals(
             curr_sig = sig_data["current"]
             conf = curr_sig.get("confidence", 0)
 
-            # Auto-execute trade on Deriv if enabled and signal meets confidence criteria
-            if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT"):
+            # Auto-execute trade on Deriv if enabled, market is open, and signal meets confidence criteria
+            if deriv_trader.is_auto_trading_enabled and curr_sig.get("signal") in ("CALL", "PUT") and deriv_trader.is_market_open_for_asset(sym):
                 min_conf = float(deriv_trader.config.get("min_confidence", 80))
                 if conf >= min_conf:
                     try:

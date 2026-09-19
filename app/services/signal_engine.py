@@ -27,13 +27,20 @@ def is_active_session(timestamp_seconds: int, asset_type: str = "forex") -> bool
     """
     Returns True if this candle falls in an active trading session.
     Crypto & Synthetics trade 24/7 → always True.
-    Forex & Commodities → only during London or NY session.
+    Forex & Commodities → closed on weekends; only during London or NY session when open.
     """
     if asset_type in ("crypto", "synthetic"):
         return True
     try:
-        dt   = datetime.datetime.fromtimestamp(timestamp_seconds, tz=datetime.timezone.utc)
+        dt = datetime.datetime.fromtimestamp(timestamp_seconds, tz=datetime.timezone.utc)
+        weekday = dt.weekday()
+        if weekday == 5:  # Saturday
+            return False
         hour = dt.hour + dt.minute / 60.0
+        if weekday == 4 and hour >= 21.0:  # Friday post-close
+            return False
+        if weekday == 6 and hour < 21.0:  # Sunday pre-open
+            return False
         in_london = LONDON_OPEN <= hour <= LONDON_CLOSE
         in_ny     = NY_OPEN <= hour <= NY_CLOSE
         return in_london or in_ny
