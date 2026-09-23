@@ -65,7 +65,9 @@ DERIV_SYMBOL_MAP = {
 # Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
 BLACKLISTED_SYMBOLS = {
     "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
-    "NZDUSD", "USDCHF", "GBPUSD"  # Filtered out: low win rates / heavy trend drag
+    "NZDUSD", "USDCHF", "GBPUSD",  # Filtered out: low win rates / heavy trend drag
+    # Audited low win-rate synthetics (<45% on Deriv live)
+    "1HZ25V", "R_75", "1HZ50V",
 }
 
 # Whitelist for 24/7 Autonomous Cloud Scanner (>70% Win Rate Pairs Only)
@@ -74,8 +76,8 @@ AUTONOMOUS_WATCHLIST = [
     "EURUSD", "EURGBP", "AUDUSD", "USDJPY", "GBPAUD",
     # Commodities / Metals
     "GOLD", "SILVER",
-    # Synthetic Volatility Indices (24/7 Active)
-    "R_100", "R_75", "R_50", "R_25", "R_10", "1HZ100V", "1HZ75V", "1HZ50V", "1HZ25V", "1HZ10V",
+    # Proven Clean Synthetic Volatility Indices (24/7 Active)
+    "R_100", "R_50", "R_25", "R_10", "1HZ100V", "1HZ10V",
 ]
 
 
@@ -103,7 +105,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 1.0,
-            "min_confidence": 80,
+            "min_confidence": 85.0,
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 10000.0,
@@ -642,7 +644,7 @@ class DerivAutoTrader:
             return None
 
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 75))
+        min_conf = float(self.config.get("min_confidence", 85.0))
         if confidence < min_conf:
             return None
             
@@ -683,10 +685,11 @@ class DerivAutoTrader:
             self.is_auto_trading_enabled = False
             return None
             
-        # Cooldown check on this asset
+        # Cooldown check on this asset (handles standard cooldown and loss cooldowns)
+        now_time = time.time()
         last_trade_time = self.trade_cooldowns.get(symbol, 0)
         cooldown_period = float(self.config.get("cooldown_seconds", 60))
-        if time.time() - last_trade_time < cooldown_period:
+        if now_time < last_trade_time or (now_time - last_trade_time < cooldown_period):
             return None
             
         # Max concurrent open trades check across entire portfolio
@@ -877,10 +880,10 @@ class DerivAutoTrader:
                             candles = []
                             if self.ws and self.is_connected:
                                 gran = 300 if mtype == "forex" else (300 if mtype == "metals" else 60)
-                                candles = await self.fetch_deriv_candles(sym, count=60, granularity=gran)
+                                candles = await self.fetch_deriv_candles(sym, count=250, granularity=gran)
                             if not candles or len(candles) < 30:
                                 intv = "5m" if mtype == "forex" else "1m"
-                                candles, _ = fetch_ohlcv_with_source(symbol=sym, interval=intv, limit=60)
+                                candles, _ = fetch_ohlcv_with_source(symbol=sym, interval=intv, limit=250)
 
                             if not candles or len(candles) < 30:
                                 continue
@@ -1062,11 +1065,17 @@ class DerivAutoTrader:
                     self.consecutive_losses_count += 1
                     self.log_activity(f"❌ CONTRACT LOST: #{contract_id} on {trade['symbol']} | Loss: -${abs(profit):.2f}", "warning", trade)
                     
-                    # Immediate shutdown if 2 losses reached
+                    # 15-minute loss cooldown on this specific asset to protect against runaway trends
+                    sym = trade.get("symbol")
+                    if sym:
+                        self.trade_cooldowns[sym] = time.time() + 900
+                        self.log_activity(f"⏳ Placed 15-minute loss cooldown on {sym} to protect against runaway breakout trends.", "info")
+                    
+                    # Immediate shutdown if max daily losses reached
                     max_losses = int(self.config.get("max_daily_losses", 2))
                     if self.lost_trades_count >= max_losses:
                         self.is_auto_trading_enabled = False
-                        self.log_activity(f"🛑 2 LOSSES REACHED ({self.lost_trades_count}/{max_losses})! Auto-trading STOPPED immediately to protect your capital.", "warning")
+                        self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses})! Auto-trading STOPPED to protect your capital.", "warning")
 
                 # Check if daily trade quota reached
                 max_trades = int(self.config.get("max_daily_trades", 10))

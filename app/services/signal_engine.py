@@ -415,15 +415,19 @@ def evaluate_candle_signal(
     ema_bear_hit = False
 
     if curr_ema21 is not None:
-        # Pulled back to 21 EMA and bouncing above it
         dist_pct = (close_p - curr_ema21) / curr_ema21
-        if -0.005 <= dist_pct <= 0.012:
+        # Bull: Price at 21 EMA support in uptrend OR stretched below 21 EMA into Lower BB
+        if (-0.005 <= dist_pct <= 0.012) or (dist_pct <= -0.006 and bb_bull_hit):
             bull_score += WEIGHT_EMA_PULL
-            bull_reasons.append(f"Price at 21 EMA support ({curr_ema21:.4f})")
+            desc = f"Price at 21 EMA support ({curr_ema21:.4f})" if -0.005 <= dist_pct <= 0.012 else f"Price stretched below 21 EMA ({dist_pct*100:.1f}%)"
+            bull_reasons.append(desc)
             ema_bull_hit = True
-        elif -0.012 <= dist_pct < -0.005:
+
+        # Bear: Price at 21 EMA resistance in downtrend OR stretched above 21 EMA into Upper BB
+        if (-0.012 <= dist_pct <= 0.005) or (dist_pct >= 0.006 and bb_bear_hit):
             bear_score += WEIGHT_EMA_PULL
-            bear_reasons.append(f"Price below 21 EMA resistance ({curr_ema21:.4f})")
+            desc = f"Price at 21 EMA resistance ({curr_ema21:.4f})" if -0.012 <= dist_pct <= 0.005 else f"Price stretched above 21 EMA (+{dist_pct*100:.1f}%)"
+            bear_reasons.append(desc)
             ema_bear_hit = True
 
     if curr_ema is not None:
