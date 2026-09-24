@@ -104,15 +104,15 @@ class DerivAutoTrader:
         
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
-            "default_stake": 1.0,
+            "default_stake": 0.5,
             "min_confidence": 85.0,
             "preferred_duration": 15,
             "duration_unit": "m",
-            "take_profit_daily": 10000.0,
-            "stop_loss_daily": 10000.0,
-            "max_daily_trades": 10000,       # Take N number of trades per day
-            "max_daily_losses": 10000,       # Stop if we get N losses
-            "max_concurrent_trades": 5,
+            "take_profit_daily": 2.0,
+            "stop_loss_daily": 2.0,
+            "max_daily_trades": 10000,       # Take trades until TP ($2) or SL ($2) is hit
+            "max_daily_losses": 10000,       # Governed by $2.00 stop loss
+            "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
             "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
@@ -659,22 +659,24 @@ class DerivAutoTrader:
         if not self.is_market_open_for_asset(symbol):
             return None
             
-        # Risk Check: Daily Profit Target
-        if self.daily_pnl >= float(self.config.get("take_profit_daily", 10.0)):
-            self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f}) reached. Auto-trading paused.", "warning")
-            self.is_auto_trading_enabled = False
-            return None
-            
-        # Risk Check: Max Losses Limit (Stop if we get 2 losses)
-        max_losses = int(self.config.get("max_daily_losses", 2))
-        if self.lost_trades_count >= max_losses:
-            self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses} losses). Auto-trading stopped for protection.", "warning")
+        # Risk Check: Daily Profit Target ($2.00)
+        tp_target = float(self.config.get("take_profit_daily", 2.0))
+        if tp_target > 0 and self.daily_pnl >= tp_target:
+            self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f} >= ${tp_target:.2f}) reached! Auto-trading finished successfully for today.", "success")
             self.is_auto_trading_enabled = False
             return None
 
         # Risk Check: Daily Stop Loss Dollar Limit ($2.00)
-        if self.daily_pnl <= -float(self.config.get("stop_loss_daily", 2.0)):
-            self.log_activity(f"🛑 Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f}) reached. Auto-trading stopped to protect capital.", "warning")
+        sl_target = float(self.config.get("stop_loss_daily", 2.0))
+        if sl_target > 0 and self.daily_pnl <= -sl_target:
+            self.log_activity(f"🛑 Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f} >= ${sl_target:.2f}) reached. Auto-trading stopped to protect capital.", "warning")
+            self.is_auto_trading_enabled = False
+            return None
+
+        # Risk Check: Max Losses Limit
+        max_losses = int(self.config.get("max_daily_losses", 10000))
+        if self.lost_trades_count >= max_losses:
+            self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses} losses). Auto-trading stopped for protection.", "warning")
             self.is_auto_trading_enabled = False
             return None
 
@@ -1081,16 +1083,20 @@ class DerivAutoTrader:
                         self.log_activity(f"⏳ Placed 15-minute loss cooldown on {sym} to protect against runaway breakout trends.", "info")
                     
                     # Immediate shutdown if max daily losses reached
-                    max_losses = int(self.config.get("max_daily_losses", 2))
+                    max_losses = int(self.config.get("max_daily_losses", 10000))
                     if self.lost_trades_count >= max_losses:
                         self.is_auto_trading_enabled = False
                         self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses})! Auto-trading STOPPED to protect your capital.", "warning")
 
-                # Check if daily trade quota reached
-                max_trades = int(self.config.get("max_daily_trades", 10))
-                if max_trades > 0 and self.total_trades_count >= max_trades:
+                # Immediately check Take-Profit ($2.00) & Stop-Loss ($2.00) after contract outcome
+                tp_target = float(self.config.get("take_profit_daily", 2.0))
+                sl_target = float(self.config.get("stop_loss_daily", 2.0))
+                if tp_target > 0 and self.daily_pnl >= tp_target:
                     self.is_auto_trading_enabled = False
-                    self.log_activity(f"🎯 Daily trade quota reached ({self.total_trades_count}/{max_trades} trades). Auto-trading finished for today.", "info")
+                    self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f} >= ${tp_target:.2f}) reached! Auto-trading finished successfully for today.", "success")
+                elif sl_target > 0 and self.daily_pnl <= -sl_target:
+                    self.is_auto_trading_enabled = False
+                    self.log_activity(f"🛑 Daily Stop-Loss Target (-${abs(self.daily_pnl):.2f} >= ${sl_target:.2f}) reached! Auto-trading STOPPED to protect your capital.", "warning")
 
 
 # Singleton instance
