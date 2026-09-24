@@ -850,6 +850,16 @@ class DerivAutoTrader:
         
         while True:
             try:
+                # Automatic Watchdog: if auto-trading is enabled but connection dropped, auto-reconnect
+                if self.is_auto_trading_enabled and (not self.is_connected or not self.is_authorized or not self.ws):
+                    token = self.api_token or DEFAULT_DERIV_TOKEN
+                    app_id = self.app_id or DEFAULT_DERIV_APP_ID
+                    logger.info("Autonomous Scanner Watchdog: Reconnecting to Deriv...")
+                    try:
+                        await self.connect(token=token, app_id=app_id)
+                    except Exception as re_e:
+                        logger.debug(f"Watchdog reconnect attempt: {re_e}")
+
                 if self.is_auto_trading_enabled and self.is_connected and self.is_authorized:
                     # Clean up and settle any finished contracts
                     await self.reconcile_active_contracts()
@@ -916,32 +926,31 @@ class DerivAutoTrader:
     async def run_cloud_keepalive(self):
         """
         Autonomous Cloud Keepalive Auto-Pinger:
-        Pings the public /ping endpoint every 6 minutes to guarantee Render's
+        Pings the public /ping endpoint every 3 minutes to guarantee Render's
         free-tier 15-minute inactivity idle timer never puts the server to sleep.
         Acts as an autonomous internal backup so you never depend on UptimeRobot.
         """
-        render_url = os.getenv("RENDER_EXTERNAL_URL", "https://quantum-binary-terminal.onrender.com").rstrip("/")
+        render_url = os.getenv("RENDER_EXTERNAL_URL", "https://quantum-binary-terminal-rtra.onrender.com").rstrip("/")
         ping_endpoint = f"{render_url}/ping"
-        logger.info(f"Cloud keepalive auto-pinger initialized (target: {ping_endpoint}, interval: 6 min)")
-        self.log_activity(f"💓 Auto-Pinger Active: Pinging cloud server every 6 min as 24/7 backup", "info")
-        await asyncio.sleep(30)
+        logger.info(f"Cloud keepalive auto-pinger initialized (target: {ping_endpoint}, interval: 3 min)")
+        self.log_activity(f"💓 Auto-Pinger Active: Pinging cloud server every 3 min as 24/7 backup", "info")
+        await asyncio.sleep(20)
 
         while True:
             try:
                 def _do_ping():
-                    return requests.get(ping_endpoint, headers={"User-Agent": "AutonomousCloudPinger/2.0"}, timeout=15)
+                    return requests.get(ping_endpoint, headers={"User-Agent": "AutonomousCloudPinger/2.0"}, timeout=10)
 
                 resp = await asyncio.to_thread(_do_ping)
                 if resp.status_code == 200:
-                    logger.info("Cloud keepalive heartbeat sent successfully (6-min cycle).")
-                    self.log_activity(f"💓 Auto-Pinger: 24/7 Keepalive heartbeat verified (200 OK)", "info")
+                    logger.info("Cloud keepalive heartbeat sent successfully (3-min cycle).")
                 else:
                     logger.warning(f"Cloud keepalive ping returned status {resp.status_code}")
             except Exception as e:
                 logger.debug(f"Cloud keepalive heartbeat notice: {e}")
 
-            # Sleep 6 minutes (360s) - well below Render's 15-min limit to guarantee 24/7 uptime
-            await asyncio.sleep(360)
+            # Sleep 3 minutes (180s) - well below Render's 15-min limit to guarantee 24/7 zero-sleep uptime
+            await asyncio.sleep(180)
 
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
