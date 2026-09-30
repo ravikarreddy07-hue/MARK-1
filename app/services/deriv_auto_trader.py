@@ -65,19 +65,19 @@ DERIV_SYMBOL_MAP = {
 # Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
 BLACKLISTED_SYMBOLS = {
     "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
-    "NZDUSD", "USDCHF", "GBPUSD",  # Filtered out: low win rates / heavy trend drag
+    "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",  # Filtered out: low win rates / heavy trend drag
     # Audited low win-rate synthetics (<45% on Deriv live)
-    "1HZ25V", "R_75", "1HZ50V",
+    "1HZ25V", "R_75", "1HZ50V", "R_25",
 }
 
 # Whitelist for 24/7 Autonomous Cloud Scanner (>70% Win Rate Pairs Only)
 AUTONOMOUS_WATCHLIST = [
     # Proven >70% Win-Rate Forex Pairs (Verified on live Deriv market candles)
-    "EURUSD", "EURGBP", "AUDUSD", "USDJPY", "GBPAUD",
+    "EURUSD", "EURGBP", "AUDUSD", "USDJPY",
     # Commodities / Metals
     "GOLD", "SILVER",
     # Proven Clean Synthetic Volatility Indices (24/7 Active)
-    "R_100", "R_50", "R_25", "R_10", "1HZ100V", "1HZ10V",
+    "R_100", "R_50", "R_10", "1HZ100V", "1HZ10V",
 ]
 
 
@@ -108,10 +108,10 @@ class DerivAutoTrader:
             "min_confidence": 85.0,
             "preferred_duration": 15,
             "duration_unit": "m",
-            "take_profit_daily": 2.0,
-            "stop_loss_daily": 2.0,
-            "max_daily_trades": 10000,       # Take trades until TP ($2) or SL ($2) is hit
-            "max_daily_losses": 10000,       # Governed by $2.00 stop loss
+            "take_profit_daily": 1.0,
+            "stop_loss_daily": 1.5,
+            "max_daily_trades": 10000,       # Take trades until TP ($1) or SL ($1.50) is hit
+            "max_daily_losses": 10000,       # Governed by $1.50 stop loss
             "max_concurrent_trades": 3,
             "cooldown_seconds": 60,
             "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
@@ -659,15 +659,15 @@ class DerivAutoTrader:
         if not self.is_market_open_for_asset(symbol):
             return None
             
-        # Risk Check: Daily Profit Target ($2.00)
-        tp_target = float(self.config.get("take_profit_daily", 2.0))
+        # Risk Check: Daily Profit Target ($1.00)
+        tp_target = float(self.config.get("take_profit_daily", 1.0))
         if tp_target > 0 and self.daily_pnl >= tp_target:
             self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f} >= ${tp_target:.2f}) reached! Auto-trading finished successfully for today.", "success")
             self.is_auto_trading_enabled = False
             return None
 
-        # Risk Check: Daily Stop Loss Dollar Limit ($2.00)
-        sl_target = float(self.config.get("stop_loss_daily", 2.0))
+        # Risk Check: Daily Stop Loss Dollar Limit ($1.50)
+        sl_target = float(self.config.get("stop_loss_daily", 1.5))
         if sl_target > 0 and self.daily_pnl <= -sl_target:
             self.log_activity(f"🛑 Daily Stop-Loss limit (-${abs(self.daily_pnl):.2f} >= ${sl_target:.2f}) reached. Auto-trading stopped to protect capital.", "warning")
             self.is_auto_trading_enabled = False
@@ -1088,9 +1088,9 @@ class DerivAutoTrader:
                         self.is_auto_trading_enabled = False
                         self.log_activity(f"🛑 Max losses limit reached ({self.lost_trades_count}/{max_losses})! Auto-trading STOPPED to protect your capital.", "warning")
 
-                # Immediately check Take-Profit ($2.00) & Stop-Loss ($2.00) after contract outcome
-                tp_target = float(self.config.get("take_profit_daily", 2.0))
-                sl_target = float(self.config.get("stop_loss_daily", 2.0))
+                # Immediately check Take-Profit ($1.00) & Stop-Loss ($1.50) after contract outcome
+                tp_target = float(self.config.get("take_profit_daily", 1.0))
+                sl_target = float(self.config.get("stop_loss_daily", 1.5))
                 if tp_target > 0 and self.daily_pnl >= tp_target:
                     self.is_auto_trading_enabled = False
                     self.log_activity(f"🎯 Daily Take-Profit Target (+${self.daily_pnl:.2f} >= ${tp_target:.2f}) reached! Auto-trading finished successfully for today.", "success")
