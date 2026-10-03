@@ -67,17 +67,17 @@ BLACKLISTED_SYMBOLS = {
     "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
     "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",  # Filtered out: low win rates / heavy trend drag
     # Audited low win-rate synthetics (<45% on Deriv live)
-    "1HZ25V", "R_75", "1HZ50V", "R_25",
+    "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10",
 }
 
-# Whitelist for 24/7 Autonomous Cloud Scanner (>70% Win Rate Pairs Only)
+# Whitelist for 24/7 Autonomous Cloud Scanner (>60% Win Rate Pairs Only)
 AUTONOMOUS_WATCHLIST = [
     # Proven >70% Win-Rate Forex Pairs (Verified on live Deriv market candles)
     "EURUSD", "EURGBP", "AUDUSD", "USDJPY",
     # Commodities / Metals
     "GOLD", "SILVER",
-    # Proven Clean Synthetic Volatility Indices (24/7 Active)
-    "R_100", "R_50", "R_10", "1HZ100V", "1HZ10V",
+    # Proven Clean Synthetic Volatility Indices (Consistently 60%+ Win Rate on Deriv Live)
+    "1HZ10V", "R_50",
 ]
 
 
