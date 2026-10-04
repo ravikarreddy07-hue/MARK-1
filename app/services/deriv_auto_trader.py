@@ -116,6 +116,7 @@ class DerivAutoTrader:
             "cooldown_seconds": 60,
             "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
+            "account_mode": "demo",          # "demo" or "real" (switches to ROT92728766 seamlessly)
         }
         
         # Runtime State & Performance
@@ -219,12 +220,18 @@ class DerivAutoTrader:
         if not data:
             return {"success": False, "error": "No trading accounts found for this Deriv token/App ID."}
             
-        # Select active demo or real account
+        # Select active demo or real account based on target preference
+        target_mode = str(self.config.get("account_mode", "demo")).lower()
         selected_acct = None
         for a in data:
-            if a.get("status") == "active":
+            if a.get("status") == "active" and str(a.get("account_type", "")).lower() == target_mode:
                 selected_acct = a
                 break
+        if not selected_acct:
+            for a in data:
+                if a.get("status") == "active":
+                    selected_acct = a
+                    break
         if not selected_acct:
             selected_acct = data[0]
             

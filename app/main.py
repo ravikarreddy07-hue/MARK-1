@@ -114,6 +114,7 @@ class DerivConfigRequest(BaseModel):
     cooldown_seconds: Optional[int] = Field(None, ge=5, le=600)
     allowed_market: Optional[str] = Field(None, pattern="^(all|forex|synthetics|metals)$")
     engine_version: Optional[str] = Field(None, pattern="^(v4|v4.1|v5|v5_sniper)$")
+    account_mode: Optional[str] = Field(None, pattern="^(demo|real)$")
     is_auto_trading_enabled: Optional[bool] = None
 
 class DerivManualTradeRequest(BaseModel):
