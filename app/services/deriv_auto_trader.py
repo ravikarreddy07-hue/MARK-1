@@ -112,7 +112,7 @@ class DerivAutoTrader:
             "stop_loss_daily": 1.5,
             "max_daily_trades": 10000,       # Take trades until TP ($1) or SL ($1.50) is hit
             "max_daily_losses": 10000,       # Governed by $1.50 stop loss
-            "max_concurrent_trades": 3,
+            "max_concurrent_trades": 1,
             "cooldown_seconds": 60,
             "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
@@ -702,7 +702,7 @@ class DerivAutoTrader:
             return None
             
         # Max concurrent open trades check across entire portfolio
-        if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 5)):
+        if len(self.active_contracts) >= int(self.config.get("max_concurrent_trades", 1)):
             return None
             
         # Check if asset is supported for binary options
