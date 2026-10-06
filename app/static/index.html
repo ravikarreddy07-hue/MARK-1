@@ -162,9 +162,12 @@
                         <!-- Left: Account & Auto-Trade Switch -->
                         <div class="deriv-sub-card">
                             <div class="deriv-acct-bar">
-                                <div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
                                     <span id="deriv-acct-login" style="font-size: 12px; font-weight: 800; color: #fff;">--</span>
-                                    <span id="deriv-acct-type" class="deriv-type-pill demo">DEMO</span>
+                                    <select id="deriv-account-mode-select" style="background: rgba(0,230,118,0.15); color: #00e676; border: 1px solid rgba(0,230,118,0.4); font-size: 10px; font-weight: 800; border-radius: 4px; padding: 2px 6px; cursor: pointer; text-transform: uppercase;">
+                                        <option value="real" selected>🟢 REAL (ROT92728766)</option>
+                                        <option value="demo">🟡 DEMO (DOT94309357)</option>
+                                    </select>
                                 </div>
                                 <div style="text-align: right;">
                                     <span id="deriv-acct-balance" style="font-size: 14px; font-weight: 800; color: var(--call-color);">$0.00 USD</span>

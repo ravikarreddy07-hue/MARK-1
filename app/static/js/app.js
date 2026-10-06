@@ -1100,6 +1100,14 @@ class BinaryApp {
             }
         });
 
+        const acctModeSelect = document.getElementById("deriv-account-mode-select");
+        acctModeSelect?.addEventListener("change", async (e) => {
+            const mode = e.target.value;
+            this.showToast(`Switching bot to ${mode.toUpperCase()} account...`, "info");
+            await this.updateDerivConfig({ account_mode: mode });
+            setTimeout(() => this.pollDerivStatus(), 1500);
+        });
+
         const maxTradesInput = document.getElementById("deriv-max-trades-input");
         const maxLossesInput = document.getElementById("deriv-max-losses-input");
         const marketInput = document.getElementById("deriv-market-input");
@@ -1246,9 +1254,19 @@ class BinaryApp {
                 statusBadge.textContent = "🟢 Connected";
             }
             if (loginEl) loginEl.textContent = data.account?.loginid || "--";
-            if (typeEl) {
-                typeEl.className = `deriv-type-pill ${data.account?.is_virtual ? "demo" : "real"}`;
-                typeEl.textContent = data.account?.is_virtual ? "DEMO" : "REAL";
+            const acctModeSelect = document.getElementById("deriv-account-mode-select");
+            if (acctModeSelect && document.activeElement !== acctModeSelect) {
+                const currentMode = data.account?.is_virtual ? "demo" : "real";
+                acctModeSelect.value = currentMode;
+                if (currentMode === "real") {
+                    acctModeSelect.style.background = "rgba(0,230,118,0.15)";
+                    acctModeSelect.style.color = "#00e676";
+                    acctModeSelect.style.borderColor = "rgba(0,230,118,0.4)";
+                } else {
+                    acctModeSelect.style.background = "rgba(255,179,0,0.15)";
+                    acctModeSelect.style.color = "#ffb300";
+                    acctModeSelect.style.borderColor = "rgba(255,179,0,0.4)";
+                }
             }
             if (balEl) {
                 balEl.textContent = `$${Number(data.account?.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${data.account?.currency || "USD"}`;

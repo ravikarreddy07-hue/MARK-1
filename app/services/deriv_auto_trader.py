@@ -116,7 +116,7 @@ class DerivAutoTrader:
             "cooldown_seconds": 60,
             "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
             "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
-            "account_mode": "demo",          # "demo" or "real" (switches to ROT92728766 seamlessly)
+            "account_mode": "real",          # Default: Real Options Account (ROT92728766)
         }
         
         # Runtime State & Performance
@@ -413,9 +413,22 @@ class DerivAutoTrader:
 
     def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
         """Updates trading parameters and risk management limits."""
+        prev_mode = self.config.get("account_mode", "demo")
         for k, v in new_config.items():
             if k in self.config:
                 self.config[k] = v
+
+        # If user toggled between demo and real, trigger seamless background reconnect
+        new_mode = self.config.get("account_mode", "demo")
+        if new_mode != prev_mode and self.is_connected and self.api_token:
+            self.log_activity(f"Switching account mode to {new_mode.upper()}...", "info")
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(self.connect(self.api_token, self.app_id))
+            except Exception as e:
+                logger.error(f"Failed to schedule account reconnect: {e}")
+
         if "is_auto_trading_enabled" in new_config:
             was_enabled = self.is_auto_trading_enabled
             self.is_auto_trading_enabled = bool(new_config["is_auto_trading_enabled"])
