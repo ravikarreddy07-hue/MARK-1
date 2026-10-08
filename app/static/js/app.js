@@ -1103,9 +1103,20 @@ class BinaryApp {
         const acctModeSelect = document.getElementById("deriv-account-mode-select");
         acctModeSelect?.addEventListener("change", async (e) => {
             const mode = e.target.value;
-            this.showToast(`Switching bot to ${mode.toUpperCase()} account...`, "info");
-            await this.updateDerivConfig({ account_mode: mode });
-            setTimeout(() => this.pollDerivStatus(), 1500);
+            this.showToast(`Connecting to ${mode.toUpperCase()} account (Deriv)...`, "info");
+            try {
+                const res = await fetch("/api/deriv/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ account_mode: mode }),
+                });
+                const data = await res.json();
+                this.showToast(`✅ Successfully switched to ${mode.toUpperCase()} Account!`, "win");
+                await this.pollDerivStatus();
+            } catch (err) {
+                console.error("Failed to switch account mode:", err);
+                this.showToast(`❌ Error switching to ${mode.toUpperCase()}`, "loss");
+            }
         });
 
         const maxTradesInput = document.getElementById("deriv-max-trades-input");

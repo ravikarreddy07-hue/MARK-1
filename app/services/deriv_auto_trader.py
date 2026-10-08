@@ -411,7 +411,7 @@ class DerivAutoTrader:
         self.log_activity("Disconnected from Deriv API. Auto-trading paused.", "info")
         return {"success": True, "message": "Disconnected successfully"}
 
-    def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
+    async def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
         """Updates trading parameters and risk management limits."""
         prev_mode = self.config.get("account_mode", "demo")
         for k, v in new_config.items():
@@ -420,14 +420,12 @@ class DerivAutoTrader:
 
         # If user toggled between demo and real, trigger seamless background reconnect
         new_mode = self.config.get("account_mode", "demo")
-        if new_mode != prev_mode and self.is_connected and self.api_token:
+        if new_mode != prev_mode and self.api_token:
             self.log_activity(f"Switching account mode to {new_mode.upper()}...", "info")
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    loop.create_task(self.connect(self.api_token, self.app_id))
+                await self.connect(self.api_token, self.app_id)
             except Exception as e:
-                logger.error(f"Failed to schedule account reconnect: {e}")
+                logger.error(f"Failed to reconnect on account switch: {e}")
 
         if "is_auto_trading_enabled" in new_config:
             was_enabled = self.is_auto_trading_enabled

@@ -590,10 +590,10 @@ def get_deriv_status():
 
 
 @app.post("/api/deriv/config")
-def update_deriv_config(req: DerivConfigRequest):
+async def update_deriv_config(req: DerivConfigRequest):
     """Updates auto-trading parameters and risk rules."""
     config_updates = req.model_dump(exclude_unset=True)
-    return deriv_trader.update_config(config_updates)
+    return await deriv_trader.update_config(config_updates)
 
 
 @app.post("/api/deriv/trade")
