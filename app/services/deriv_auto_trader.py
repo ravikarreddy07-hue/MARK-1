@@ -67,17 +67,15 @@ BLACKLISTED_SYMBOLS = {
     "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
     "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",  # Filtered out: low win rates / heavy trend drag
     # Audited low win-rate synthetics (<45% on Deriv live)
-    "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50",
+    "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for 24/7 Autonomous Cloud Scanner (>60% Win Rate Pairs Only)
+# Whitelist for Autonomous Cloud Scanner (>65% Win Rate Pairs Only)
 AUTONOMOUS_WATCHLIST = [
-    # Proven >70% Win-Rate Forex Pairs (Verified on live Deriv market candles)
-    "EURUSD", "EURGBP", "AUDUSD", "USDJPY",
+    # Proven Champion Forex Pairs (Verified on live Deriv market candles)
+    "EURGBP", "EURUSD", "AUDUSD", "USDJPY",
     # Commodities / Metals
-    "GOLD", "SILVER",
-    # Proven Clean Synthetic Volatility Indices (Consistently 70%+ Win Rate on Deriv Live)
-    "1HZ10V",
+    "SILVER", "GOLD",
 ]
 
 
@@ -105,7 +103,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 0.5,
-            "min_confidence": 85.0,
+            "min_confidence": 88.0,
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 1.0,
