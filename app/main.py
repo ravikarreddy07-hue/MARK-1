@@ -527,8 +527,53 @@ def get_optimize(
 
 @app.get("/api/trades")
 def get_trades():
-    """Returns all recorded trades."""
-    return trade_manager.get_all_trades()
+    """Returns all recorded trades merged with active Deriv contracts."""
+    trades = list(trade_manager.get_all_trades())
+    existing_ids = {str(t.get("deriv_contract_id") or t.get("id")) for t in trades}
+    
+    # Also inject active Deriv contracts so open trades are always visible on the website
+    for cid, ac in getattr(deriv_trader, "active_contracts", {}).items():
+        cid_str = str(cid)
+        tm_id = str(ac.get("tm_id", ""))
+        if cid_str not in existing_ids and tm_id not in existing_ids:
+            dur_str = str(ac.get("duration", "15m"))
+            dur_sec = 900
+            try:
+                if dur_str.endswith("m"):
+                    dur_sec = int(dur_str[:-1]) * 60
+                elif dur_str.endswith("s"):
+                    dur_sec = int(dur_str[:-1])
+                elif dur_str.endswith("h"):
+                    dur_sec = int(dur_str[:-1]) * 3600
+                elif dur_str.isdigit():
+                    dur_sec = int(dur_str)
+            except Exception:
+                dur_sec = 900
+
+            start_t = ac.get("start_time") or int(time.time())
+            buy = float(ac.get("stake") or 0.5)
+            payout = float(ac.get("payout") or 0.94)
+            rate = round((payout - buy) / buy, 2) if buy > 0 else 0.85
+            entry_p = float(ac.get("spot") or 0.0)
+
+            trades.insert(0, {
+                "id": cid_str,
+                "deriv_contract_id": cid_str,
+                "symbol": ac.get("symbol", "UNKNOWN"),
+                "timeframe": dur_str,
+                "signal": ac.get("signal", "CALL").upper(),
+                "entry_time": start_t,
+                "expiry_time": start_t + dur_sec,
+                "duration_seconds": dur_sec,
+                "entry_price": entry_p,
+                "exit_price": None,
+                "stake": buy,
+                "payout_rate": rate,
+                "pnl": 0.0,
+                "status": "OPEN",
+                "outcome": "PENDING",
+            })
+    return trades
 
 
 @app.post("/api/trades")

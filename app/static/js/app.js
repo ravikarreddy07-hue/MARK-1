@@ -430,6 +430,7 @@ class BinaryApp {
         this.pollInterval = setInterval(() => {
             this.loadMarketData(false);
             this.loadSignalsStream();
+            this.loadTradeHistory();
         }, 4500);
     }
 
@@ -816,23 +817,40 @@ class BinaryApp {
         const tbody = document.getElementById("trade-history-tbody");
         const winRatePill = document.getElementById("win-rate-pill");
         const pnlDisplay = document.getElementById("net-pnl-display");
+        const activeCountPill = document.getElementById("active-trades-count-pill");
         if (!tbody) return;
 
         tbody.innerHTML = "";
 
+        if (!trades || trades.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">
+                        No trades executed yet today. Live trades from Deriv and manual execution will appear here.
+                    </td>
+                </tr>
+            `;
+            if (activeCountPill) activeCountPill.style.display = "none";
+            return;
+        }
+
         let wins = 0;
         let closedCount = 0;
         let totalPnl = 0.0;
+        let activeCount = 0;
 
         trades.forEach((t) => {
-            if (t.status === "CLOSED") {
+            const isOpen = t.status === "OPEN" || t.status === "ACTIVE" || t.outcome === "PENDING";
+            if (isOpen) {
+                activeCount++;
+            } else if (t.status === "CLOSED" || t.outcome === "WIN" || t.outcome === "LOSS") {
                 closedCount++;
                 if (t.outcome === "WIN") wins++;
-                totalPnl += t.pnl;
+                totalPnl += (t.pnl || 0.0);
             }
 
             const tr = document.createElement("tr");
-            const d = new Date(t.entry_time * 1000);
+            const d = new Date((t.entry_time || Math.floor(Date.now() / 1000)) * 1000);
             const timeStr = d.toLocaleTimeString('en-IN', {
                 timeZone: 'Asia/Kolkata',
                 hour: '2-digit',
@@ -841,27 +859,66 @@ class BinaryApp {
                 hour12: true
             }) + ' IST';
 
-            const outClass = t.outcome === "WIN" ? "win" : t.outcome === "LOSS" ? "loss" : "tie";
-            const pnlClass = t.pnl > 0 ? "win" : t.pnl < 0 ? "loss" : "";
+            const outClass = isOpen ? "open" : (t.outcome === "WIN" ? "win" : t.outcome === "LOSS" ? "loss" : "tie");
+            const pnlClass = isOpen ? "open" : (t.pnl > 0 ? "win" : t.pnl < 0 ? "loss" : "");
 
-            const durLabel = t.duration_seconds >= 60 ? `${Math.round(t.duration_seconds / 60)}m` : `${t.duration_seconds}s`;
-            const stakeDisplay = `$${Number(t.stake || 1.0).toFixed(2)}`;
+            let durLabel = (t.duration_seconds && t.duration_seconds >= 60)
+                ? `${Math.round(t.duration_seconds / 60)}m`
+                : (t.timeframe || `${t.duration_seconds || 60}s`);
+
+            if (isOpen && t.expiry_time) {
+                const nowSec = Math.floor(Date.now() / 1000);
+                const rem = Math.max(0, t.expiry_time - nowSec);
+                if (rem > 0) {
+                    const remM = Math.floor(rem / 60);
+                    const remS = rem % 60;
+                    durLabel += ` (${remM > 0 ? remM + 'm ' : ''}${remS}s left)`;
+                } else {
+                    durLabel += ` (Settling...)`;
+                }
+            }
+
+            const stakeDisplay = `$${Number(t.stake || 0.5).toFixed(2)}`;
             const entryDisplay = t.entry_price ? Number(t.entry_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '--';
-            const exitDisplay = t.exit_price ? Number(t.exit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '<span style="color:var(--accent-blue)">ACTIVE...</span>';
+            const exitDisplay = isOpen
+                ? `<span style="color:#60a5fa; font-weight:700; display:inline-flex; align-items:center; gap:5px;"><span class="active-pulse-dot"></span>ACTIVE...</span>`
+                : (t.exit_price ? Number(t.exit_price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : '--');
+
+            const outcomeBadge = isOpen
+                ? `<span class="badge-sig open">⏳ OPEN</span>`
+                : `<span class="badge-sig ${outClass}">${t.outcome}</span>`;
+
+            const pnlCell = isOpen
+                ? `<td style="color:#60a5fa; font-weight:600;">$0.00 (In Trade)</td>`
+                : `<td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}$${Number(t.pnl).toFixed(2)}</td>`;
+
+            if (isOpen) {
+                tr.style.background = "rgba(59, 130, 246, 0.08)";
+                tr.style.borderLeft = "3px solid #3b82f6";
+            }
 
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td><strong>${t.symbol}</strong></td>
-                <td><span class="badge-sig ${t.signal.toLowerCase()}">${t.signal}</span></td>
+                <td><span class="badge-sig ${(t.signal || 'call').toLowerCase()}">${t.signal}</span></td>
                 <td>${durLabel}</td>
                 <td><strong style="color: #fff;">${stakeDisplay}</strong></td>
                 <td style="color: var(--text-secondary);">${entryDisplay}</td>
                 <td style="color: var(--text-secondary);">${exitDisplay}</td>
-                <td><span class="badge-sig ${outClass}">${t.outcome}</span></td>
-                <td class="${pnlClass}">${t.pnl >= 0 ? '+' : ''}$${Number(t.pnl).toFixed(2)}</td>
+                <td>${outcomeBadge}</td>
+                ${pnlCell}
             `;
             tbody.appendChild(tr);
         });
+
+        if (activeCountPill) {
+            if (activeCount > 0) {
+                activeCountPill.style.display = "inline-flex";
+                activeCountPill.textContent = `⚡ ${activeCount} OPEN DERIV TRADE${activeCount > 1 ? 'S' : ''}`;
+            } else {
+                activeCountPill.style.display = "none";
+            }
+        }
 
         if (winRatePill) {
             const wr = closedCount > 0 ? ((wins / closedCount) * 100).toFixed(1) : "--";
@@ -1328,6 +1385,64 @@ class BinaryApp {
                     return `<div class="deriv-log-line" style="color: ${color};">[${a.time_str}] ${escapeHtml(a.message)}</div>`;
                 }).join("");
             }
+
+            // Active Deriv Contracts Sync (Live HUD Box & Table refresh)
+            const activeContracts = data.active_contracts || [];
+            const countdownBox = document.getElementById("active-trade-box");
+
+            if (activeContracts.length > 0) {
+                const ac = activeContracts[0];
+                if (countdownBox) countdownBox.style.display = "flex";
+                const activeEntryEl = document.getElementById("active-entry-price");
+                const activeSigEl = document.getElementById("active-signal-badge");
+                const timerText = document.getElementById("countdown-timer-text");
+                const bar = document.getElementById("countdown-progress-bar");
+                const statusEl = document.getElementById("active-trade-status");
+
+                if (activeSigEl) {
+                    const sig = (ac.signal || "CALL").toUpperCase();
+                    activeSigEl.className = `badge-sig ${sig.toLowerCase()}`;
+                    activeSigEl.textContent = `${ac.symbol || ''} ${sig}`.trim();
+                }
+                if (activeEntryEl) {
+                    const entryVal = ac.spot || ac.barrier || ac.entry_price;
+                    activeEntryEl.textContent = entryVal ? Number(entryVal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) : "--";
+                }
+
+                let durSec = 900;
+                const dStr = String(ac.duration || "15m");
+                if (dStr.endsWith("m")) durSec = parseInt(dStr) * 60;
+                else if (dStr.endsWith("s")) durSec = parseInt(dStr);
+                else if (dStr.endsWith("h")) durSec = parseInt(dStr) * 3600;
+
+                const startTime = ac.start_time || Math.floor(Date.now() / 1000);
+                const expiryTime = startTime + durSec;
+                const now = Math.floor(Date.now() / 1000);
+                const remaining = Math.max(0, expiryTime - now);
+
+                const mins = Math.floor(remaining / 60);
+                const secs = remaining % 60;
+                if (timerText) {
+                    timerText.textContent = remaining > 0 ? `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}` : "00:00 (Settling...)";
+                }
+                if (bar) {
+                    const pct = Math.max(0, Math.min(100, (remaining / durSec) * 100));
+                    bar.style.width = `${pct}%`;
+                }
+                if (statusEl) {
+                    const stakeVal = Number(ac.stake || 0.5).toFixed(2);
+                    const payoutVal = Number(ac.payout || 0.94).toFixed(2);
+                    statusEl.innerHTML = `Deriv Contract: <strong>#${ac.contract_id || ac.id || '--'}</strong> | Stake: <strong>$${stakeVal}</strong> | Payout: <strong>$${payoutVal}</strong>`;
+                }
+            } else if (!this.activeTradeTimer) {
+                if (countdownBox) countdownBox.style.display = "none";
+            }
+
+            // If active contracts count changed (trade opened or closed), refresh trade history immediately
+            if (this.lastActiveContractsCount !== undefined && this.lastActiveContractsCount !== activeContracts.length) {
+                this.loadTradeHistory();
+            }
+            this.lastActiveContractsCount = activeContracts.length;
         } else {
             if (authSec) authSec.style.display = "flex";
             if (actSec) actSec.style.display = "none";
