@@ -175,16 +175,22 @@ class BinaryApp {
         localStorage.setItem("qb_indicator_settings", JSON.stringify(this.settings));
     }
 
-    async init() {
+    init() {
         this.updateEliteSniperUI();
         this.populateSymbolDropdown();
-        this.tvManager.loadChart(this.tvSymbol, this.interval);
         this.bindEvents();
         this.populateSettingsForm();
-        await this.loadMarketData();
-        await this.loadTradeHistory();
-        await this.loadSignalsStream();
         this.initDerivBot();
+
+        // Load TradingView chart immediately
+        this.tvManager.loadChart(this.tvSymbol, this.interval);
+
+        // Fetch data in parallel in background without freezing UI
+        this.loadMarketData();
+        this.loadTradeHistory();
+        this.loadSignalsStream();
+
+        // Start polling loops
         this.startPolling();
     }
 
@@ -429,12 +435,18 @@ class BinaryApp {
         if (this.pollInterval) clearInterval(this.pollInterval);
         this.pollInterval = setInterval(() => {
             this.loadMarketData(false);
-            this.loadSignalsStream();
             this.loadTradeHistory();
-        }, 4500);
+        }, 3500);
+
+        if (this.signalsInterval) clearInterval(this.signalsInterval);
+        this.signalsInterval = setInterval(() => {
+            this.loadSignalsStream();
+        }, 15000);
     }
 
     async loadSignalsStream() {
+        if (this.isLoadingSignals) return;
+        this.isLoadingSignals = true;
         try {
             const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v5_sniper'}`);
             if (!res.ok) return;
@@ -443,6 +455,8 @@ class BinaryApp {
             this.renderSignalsStream();
         } catch (e) {
             console.error("Signals stream fetch error:", e);
+        } finally {
+            this.isLoadingSignals = false;
         }
     }
 
@@ -556,6 +570,8 @@ class BinaryApp {
     }
 
     async loadMarketData(showLoading = true) {
+        if (this.isLoadingMarketData) return;
+        this.isLoadingMarketData = true;
         try {
             const params = new URLSearchParams({
                 symbol: this.symbol,
@@ -594,6 +610,8 @@ class BinaryApp {
             this.checkAndResolveTrades();
         } catch (err) {
             console.error("Market data poll error:", err);
+        } finally {
+            this.isLoadingMarketData = false;
         }
     }
 
@@ -804,12 +822,17 @@ class BinaryApp {
     }
 
     async loadTradeHistory() {
+        if (this.isLoadingTrades) return;
+        this.isLoadingTrades = true;
         try {
             const res = await fetch("/api/trades");
+            if (!res.ok) return;
             const trades = await res.json();
             this.renderTradeTable(trades);
         } catch (err) {
             console.error("Load trades error:", err);
+        } finally {
+            this.isLoadingTrades = false;
         }
     }
 
@@ -1359,6 +1382,8 @@ class BinaryApp {
     }
 
     async pollDerivStatus() {
+        if (this.isPollingDeriv) return;
+        this.isPollingDeriv = true;
         try {
             const res = await fetch("/api/deriv/status");
             if (!res.ok) return;
@@ -1366,6 +1391,8 @@ class BinaryApp {
             this.renderDerivStatus(data);
         } catch (e) {
             // Silently ignore background polling glitches
+        } finally {
+            this.isPollingDeriv = false;
         }
     }
 
