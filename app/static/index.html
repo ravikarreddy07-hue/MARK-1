@@ -176,13 +176,21 @@
 
                             <div class="deriv-toggle-row" style="margin-top: 8px;">
                                 <div style="display: flex; flex-direction: column;">
-                                    <span style="font-size: 13px; font-weight: 800; color: #fff;">⚡ Auto-Trade Execution</span>
-                                    <span style="font-size: 11px; color: var(--text-secondary);">Auto-buys on Confirmed Signals</span>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 13px; font-weight: 800; color: #fff;">⚡ Auto-Trade Execution</span>
+                                        <span id="deriv-auto-status-text" style="font-size: 11px; font-weight: 800; color: #00e676;">[ON - ACTIVE]</span>
+                                    </div>
+                                    <span style="font-size: 11px; color: var(--text-secondary);">Auto-buys on Confirmed Signals (≥88%)</span>
                                 </div>
-                                <label class="switch">
-                                    <input type="checkbox" id="deriv-auto-switch">
-                                    <span class="slider round"></span>
-                                </label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <button id="btn-toggle-bot-state" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer; border-radius: 6px;">
+                                        🛑 STOP BOT
+                                    </button>
+                                    <label class="switch" style="cursor: pointer;" title="Toggle Auto Trading">
+                                        <input type="checkbox" id="deriv-auto-switch">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
                             </div>
 
                             <div class="deriv-stats-row" style="margin-top: 6px;">

@@ -431,8 +431,8 @@ class DerivAutoTrader:
             status_str = "ACTIVE ⚡ (Cloud 24/7)" if self.is_auto_trading_enabled else "PAUSED ⏸️"
             self.log_activity(f"Auto-Trading switched to: {status_str}", "info")
 
-            # Automatically refresh/clear trade history and session stats when starting auto bot
-            if self.is_auto_trading_enabled and not was_enabled:
+            # Automatically refresh/clear trade history and session stats whenever starting auto bot
+            if self.is_auto_trading_enabled:
                 try:
                     from app.services.trade_manager import trade_manager
                     trade_manager.clear_history()

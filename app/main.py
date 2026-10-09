@@ -612,9 +612,14 @@ def update_trade(trade_id: str, req: TradeUpdateRequest):
 
 @app.delete("/api/trades")
 def clear_trades():
-    """Clears trade journal."""
+    """Clears trade journal and resets session stats."""
     trade_manager.clear_history()
-    return {"message": "Trade history cleared"}
+    deriv_trader.daily_pnl = 0.0
+    deriv_trader.total_trades_count = 0
+    deriv_trader.won_trades_count = 0
+    deriv_trader.lost_trades_count = 0
+    deriv_trader.consecutive_losses_count = 0
+    return {"message": "Trade history cleared and session reset"}
 
 
 # ─── DERIV AUTOMATED TRADING BOT ENDPOINTS ────────────────────────────────────

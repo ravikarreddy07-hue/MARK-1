@@ -825,12 +825,17 @@ class BinaryApp {
         if (!trades || trades.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">
-                        No trades executed yet today. Live trades from Deriv and manual execution will appear here.
+                    <td colspan="9" style="text-align: center; padding: 22px; color: #94a3b8; font-size: 12px;">
+                        ⚡ New bot session active. Waiting for high-confluence signal (≥88%). Live trades will appear here instantly.
                     </td>
                 </tr>
             `;
             if (activeCountPill) activeCountPill.style.display = "none";
+            if (winRatePill) winRatePill.textContent = "Win Rate: --% (0/0)";
+            if (pnlDisplay) {
+                pnlDisplay.textContent = "+$0.00";
+                pnlDisplay.style.color = "var(--call-color)";
+            }
             return;
         }
 
@@ -1142,19 +1147,16 @@ class BinaryApp {
             this.disconnectDeriv();
         });
 
-        autoSwitch?.addEventListener("change", async (e) => {
-            const enabled = e.target.checked;
-            this.updateDerivConfig({ is_auto_trading_enabled: enabled });
-            if (enabled) {
-                // Automatically refresh trade table for fresh session
-                try {
-                    await fetch("/api/trades", { method: "DELETE" });
-                    await this.loadTradeHistory();
-                } catch (err) {}
-                this.showToast("⚡ Deriv Auto-Trading ACTIVE! Trade history refreshed for new session.", "win");
-            } else {
-                this.showToast("⏸️ Deriv Auto-Trading PAUSED.", "info");
-            }
+        const autoSwitch = document.getElementById("deriv-auto-switch");
+        const btnToggleBot = document.getElementById("btn-toggle-bot-state");
+
+        autoSwitch?.addEventListener("change", (e) => {
+            this.toggleAutoTrading(e.target.checked);
+        });
+
+        btnToggleBot?.addEventListener("click", () => {
+            const currentChecked = autoSwitch ? autoSwitch.checked : false;
+            this.toggleAutoTrading(!currentChecked);
         });
 
         const acctModeSelect = document.getElementById("deriv-account-mode-select");
@@ -1279,6 +1281,71 @@ class BinaryApp {
         }
     }
 
+    updateBotToggleUi(isActive) {
+        const autoSwitch = document.getElementById("deriv-auto-switch");
+        const btnToggleBot = document.getElementById("btn-toggle-bot-state");
+        const statusText = document.getElementById("deriv-auto-status-text");
+
+        if (autoSwitch && document.activeElement !== autoSwitch) {
+            autoSwitch.checked = !!isActive;
+        }
+        if (statusText) {
+            statusText.textContent = isActive ? "[ON - ACTIVE]" : "[OFF - PAUSED]";
+            statusText.style.color = isActive ? "#00e676" : "#94a3b8";
+        }
+        if (btnToggleBot) {
+            btnToggleBot.textContent = isActive ? "🛑 STOP BOT" : "⚡ START BOT";
+            btnToggleBot.style.background = isActive ? "rgba(255, 61, 87, 0.2)" : "rgba(0, 230, 118, 0.2)";
+            btnToggleBot.style.color = isActive ? "#ff3d57" : "#00e676";
+            btnToggleBot.style.borderColor = isActive ? "rgba(255, 61, 87, 0.5)" : "rgba(0, 230, 118, 0.5)";
+        }
+    }
+
+    async toggleAutoTrading(targetState) {
+        if (this.isTogglingAutoTrading) return;
+        this.isTogglingAutoTrading = true;
+
+        const autoSwitch = document.getElementById("deriv-auto-switch");
+        const btnToggleBot = document.getElementById("btn-toggle-bot-state");
+        if (autoSwitch) autoSwitch.disabled = true;
+        if (btnToggleBot) btnToggleBot.disabled = true;
+
+        try {
+            // Immediate optimistic UI update
+            this.updateBotToggleUi(targetState);
+
+            const res = await fetch("/api/deriv/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_auto_trading_enabled: targetState }),
+            });
+            const data = await res.json();
+            const actualState = (data && data.is_auto_trading_enabled !== undefined) ? data.is_auto_trading_enabled : targetState;
+            this.updateBotToggleUi(actualState);
+
+            if (actualState) {
+                // When turned ON: History changes every time! Clear old session and start fresh
+                try {
+                    await fetch("/api/trades", { method: "DELETE" });
+                    await this.loadTradeHistory();
+                } catch (e) {}
+                this.showToast("⚡ Deriv Auto-Trading is ON! Fresh session started.", "win");
+            } else {
+                this.showToast("🛑 Deriv Auto-Trading is OFF / PAUSED.", "loss");
+            }
+        } catch (err) {
+            console.error("Failed to toggle auto-trading:", err);
+            this.showToast("Error updating bot state. Check network.", "loss");
+            if (autoSwitch) autoSwitch.checked = !targetState;
+        } finally {
+            if (autoSwitch) autoSwitch.disabled = false;
+            if (btnToggleBot) btnToggleBot.disabled = false;
+            setTimeout(() => {
+                this.isTogglingAutoTrading = false;
+            }, 2500);
+        }
+    }
+
     async updateDerivConfig(updates) {
         try {
             await fetch("/api/deriv/config", {
@@ -1339,8 +1406,8 @@ class BinaryApp {
             if (balEl) {
                 balEl.textContent = `$${Number(data.account?.balance || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${data.account?.currency || "USD"}`;
             }
-            if (switchEl) {
-                switchEl.checked = data.is_auto_trading_enabled;
+            if (!this.isTogglingAutoTrading) {
+                this.updateBotToggleUi(!!data.is_auto_trading_enabled);
             }
             if (pnlEl) {
                 const pnl = data.stats?.daily_pnl || 0;
