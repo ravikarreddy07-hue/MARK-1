@@ -132,11 +132,11 @@
                         <span class="deriv-logo-pill">DERIV</span>
                         <span class="deriv-bot-title">Automated Trading Bot Command Center</span>
                     </div>
-                    <span id="deriv-conn-status" class="deriv-status-badge disconnected">⚪ Disconnected</span>
+                    <span id="deriv-conn-status" class="deriv-status-badge connected">🟢 Connected</span>
                 </div>
 
                 <!-- Token Form (Shown when disconnected) -->
-                <div id="deriv-auth-section" class="deriv-section">
+                <div id="deriv-auth-section" class="deriv-section" style="display: none;">
                     <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 230px;">
                             <label style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 4px;">Deriv Personal Access Token (PAT) or API Token:</label>
@@ -157,20 +157,20 @@
                 </div>
 
                 <!-- Bot Dashboard (Shown when connected) -->
-                <div id="deriv-active-section" class="deriv-section" style="display: none;">
+                <div id="deriv-active-section" class="deriv-section" style="display: flex;">
                     <div class="deriv-bot-main-grid">
                         <!-- Left: Account & Auto-Trade Switch -->
                         <div class="deriv-sub-card">
                             <div class="deriv-acct-bar">
                                 <div style="display: flex; align-items: center; gap: 6px;">
-                                    <span id="deriv-acct-login" style="font-size: 12px; font-weight: 800; color: #fff;">--</span>
+                                    <span id="deriv-acct-login" style="font-size: 12px; font-weight: 800; color: #fff;">ROT92728766</span>
                                     <select id="deriv-account-mode-select" style="background: rgba(0,230,118,0.15); color: #00e676; border: 1px solid rgba(0,230,118,0.4); font-size: 10px; font-weight: 800; border-radius: 4px; padding: 2px 6px; cursor: pointer; text-transform: uppercase;">
                                         <option value="real" selected>🟢 REAL (ROT92728766)</option>
                                         <option value="demo">🟡 DEMO (DOT94309357)</option>
                                     </select>
                                 </div>
                                 <div style="text-align: right;">
-                                    <span id="deriv-acct-balance" style="font-size: 14px; font-weight: 800; color: var(--call-color);">$0.00 USD</span>
+                                    <span id="deriv-acct-balance" style="font-size: 14px; font-weight: 800; color: var(--call-color);">$2.70 USD</span>
                                 </div>
                             </div>
 
@@ -183,11 +183,11 @@
                                     <span style="font-size: 11px; color: var(--text-secondary);">Auto-buys on Confirmed Signals (≥88%)</span>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 8px;">
-                                    <button id="btn-toggle-bot-state" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer; border-radius: 6px;">
+                                    <button id="btn-toggle-bot-state" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer; border-radius: 6px; background: rgba(255, 61, 87, 0.2); color: #ff3d57; border-color: rgba(255, 61, 87, 0.5);">
                                         🛑 STOP BOT
                                     </button>
                                     <label class="switch" style="cursor: pointer;" title="Toggle Auto Trading">
-                                        <input type="checkbox" id="deriv-auto-switch">
+                                        <input type="checkbox" id="deriv-auto-switch" checked>
                                         <span class="slider round"></span>
                                     </label>
                                 </div>
@@ -639,7 +639,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <!-- Application JavaScript Bundles -->
-    <script src="/static/js/chart.js?v=14.0"></script>
-    <script src="/static/js/app.js?v=14.0"></script>
+    <script src="/static/js/chart.js?v=15.0"></script>
+    <script src="/static/js/app.js?v=15.0"></script>
 </body>
 </html>

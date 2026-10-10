@@ -176,22 +176,22 @@ class BinaryApp {
     }
 
     init() {
-        this.updateEliteSniperUI();
-        this.populateSymbolDropdown();
-        this.bindEvents();
-        this.populateSettingsForm();
-        this.initDerivBot();
+        try { this.updateEliteSniperUI(); } catch (e) { console.error("updateEliteSniperUI error:", e); }
+        try { this.populateSymbolDropdown(); } catch (e) { console.error("populateSymbolDropdown error:", e); }
+        try { this.bindEvents(); } catch (e) { console.error("bindEvents error:", e); }
+        try { this.populateSettingsForm(); } catch (e) { console.error("populateSettingsForm error:", e); }
+        try { this.initDerivBot(); } catch (e) { console.error("initDerivBot error:", e); }
 
         // Load TradingView chart immediately
-        this.tvManager.loadChart(this.tvSymbol, this.interval);
+        try { this.tvManager.loadChart(this.tvSymbol, this.interval); } catch (e) { console.error("tvManager.loadChart error:", e); }
 
         // Fetch data in parallel in background without freezing UI
-        this.loadMarketData();
-        this.loadTradeHistory();
-        this.loadSignalsStream();
+        try { this.loadMarketData(); } catch (e) {}
+        try { this.loadTradeHistory(); } catch (e) {}
+        try { this.loadSignalsStream(); } catch (e) {}
 
         // Start polling loops
-        this.startPolling();
+        try { this.startPolling(); } catch (e) {}
     }
 
     updateEliteSniperUI() {
@@ -1170,7 +1170,6 @@ class BinaryApp {
             this.disconnectDeriv();
         });
 
-        const autoSwitch = document.getElementById("deriv-auto-switch");
         const btnToggleBot = document.getElementById("btn-toggle-bot-state");
 
         autoSwitch?.addEventListener("change", (e) => {

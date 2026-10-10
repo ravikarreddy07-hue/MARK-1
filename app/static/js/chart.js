@@ -57,6 +57,7 @@ class TradingViewChartManager {
 
         if (typeof TradingView !== "undefined") {
             try {
+                this.retryCount = 0;
                 this.widget = new TradingView.widget({
                     autosize: true,
                     symbol: this.currentSymbol,
@@ -86,11 +87,24 @@ class TradingViewChartManager {
                 });
             } catch (e) {
                 console.error("TradingView widget init error:", e);
+                this.loadIframeFallback(innerDiv);
             }
         } else {
-            console.warn("TradingView library (tv.js) not loaded yet, retrying in 500ms...");
-            setTimeout(() => this.loadChart(this.currentSymbol, this.currentInterval), 500);
+            this.retryCount = (this.retryCount || 0) + 1;
+            if (this.retryCount > 6) {
+                console.warn("TradingView library (tv.js) timeout. Rendering direct iframe embed.");
+                this.loadIframeFallback(innerDiv);
+            } else {
+                setTimeout(() => this.loadChart(this.currentSymbol, this.currentInterval), 500);
+            }
         }
+    }
+
+    loadIframeFallback(container) {
+        if (!container) return;
+        const sym = encodeURIComponent(this.currentSymbol || "FX:EURUSD");
+        const intv = encodeURIComponent(this.currentInterval || "1");
+        container.innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tv_chart_inner&symbol=${sym}&interval=${intv}&theme=dark&style=1" style="width:100%;height:100%;border:none;border-radius:8px;" allowtransparency="true" scrolling="no"></iframe>`;
     }
 
     setSymbol(tvSymbol) {
