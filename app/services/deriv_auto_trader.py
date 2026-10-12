@@ -114,7 +114,7 @@ class DerivAutoTrader:
             "max_concurrent_trades": 1,
             "cooldown_seconds": 900,
             "allowed_market": "all",
-            "engine_version": "v5_sniper",
+            "engine_version": "v4.1",
             "account_mode": "real",
         }
         
