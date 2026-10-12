@@ -1200,23 +1200,23 @@ class BinaryApp {
             }
         });
 
-        const maxTradesInput = document.getElementById("deriv-max-trades-input");
+        const maxWinsInput = document.getElementById("deriv-max-wins-input");
         const maxLossesInput = document.getElementById("deriv-max-losses-input");
         const marketInput = document.getElementById("deriv-market-input");
         const engineInput = document.getElementById("deriv-engine-input");
 
-        [stakeInput, confInput, tpInput, slInput, maxTradesInput, maxLossesInput, marketInput, engineInput].forEach((inp) => {
+        [stakeInput, confInput, tpInput, slInput, maxWinsInput, maxLossesInput, marketInput, engineInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
-                const selectedEngine = engineInput?.value || "v5_sniper";
+                const selectedEngine = engineInput?.value || "v4.1";
                 this.engineVersion = selectedEngine;
                 const updates = {
-                    default_stake: parseFloat(stakeInput?.value || 1.0),
-                    min_confidence: parseInt(confInput?.value || 75),
+                    default_stake: parseFloat(stakeInput?.value || 0.5),
+                    min_confidence: parseInt(confInput?.value || 88),
                     take_profit_daily: parseFloat(tpInput?.value || 10000.0),
                     stop_loss_daily: parseFloat(slInput?.value || 10000.0),
-                    max_daily_trades: parseInt(maxTradesInput?.value || 10000),
+                    max_daily_wins: parseInt(maxWinsInput?.value || 2),
                     max_daily_losses: parseInt(maxLossesInput?.value || 10000),
-                    allowed_market: marketInput?.value || "forex",
+                    allowed_market: marketInput?.value || "all",
                     engine_version: selectedEngine,
                 };
                 this.updateDerivConfig(updates);
@@ -1453,14 +1453,14 @@ class BinaryApp {
                 const confInp = document.getElementById("deriv-conf-input");
                 const tpInp = document.getElementById("deriv-tp-input");
                 const slInp = document.getElementById("deriv-sl-input");
-                const maxTInp = document.getElementById("deriv-max-trades-input");
+                const maxWInp = document.getElementById("deriv-max-wins-input");
                 const maxLInp = document.getElementById("deriv-max-losses-input");
 
                 if (stakeInp && document.activeElement !== stakeInp && data.config.default_stake !== undefined) stakeInp.value = data.config.default_stake;
                 if (confInp && document.activeElement !== confInp && data.config.min_confidence !== undefined) confInp.value = data.config.min_confidence;
                 if (tpInp && document.activeElement !== tpInp && data.config.take_profit_daily !== undefined) tpInp.value = data.config.take_profit_daily;
                 if (slInp && document.activeElement !== slInp && data.config.stop_loss_daily !== undefined) slInp.value = data.config.stop_loss_daily;
-                if (maxTInp && document.activeElement !== maxTInp && data.config.max_daily_trades !== undefined) maxTInp.value = data.config.max_daily_trades;
+                if (maxWInp && document.activeElement !== maxWInp && data.config.max_daily_wins !== undefined) maxWInp.value = data.config.max_daily_wins;
                 if (maxLInp && document.activeElement !== maxLInp && data.config.max_daily_losses !== undefined) maxLInp.value = data.config.max_daily_losses;
                 const marketInp = document.getElementById("deriv-market-input");
                 if (marketInp && document.activeElement !== marketInp && data.config.allowed_market !== undefined) marketInp.value = data.config.allowed_market;

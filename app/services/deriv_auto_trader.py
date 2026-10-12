@@ -111,6 +111,7 @@ class DerivAutoTrader:
             "stop_loss_daily": 10000.0,
             "max_daily_trades": 10000,
             "max_daily_losses": 10000,
+            "max_daily_wins": 2,
             "max_concurrent_trades": 1,
             "cooldown_seconds": 900,
             "allowed_market": "all",
@@ -703,6 +704,13 @@ class DerivAutoTrader:
             self.log_activity(f"🎯 Daily trade quota reached ({self.total_trades_count}/{max_trades} trades). Auto-trading completed for today.", "info")
             self.is_auto_trading_enabled = False
             return None
+
+        # Risk Check: Max Daily Wins Target (Stop after N wins)
+        max_wins = int(self.config.get("max_daily_wins", 10000))
+        if max_wins < 10000 and self.won_trades_count >= max_wins:
+            self.log_activity(f"🏆 Target of {max_wins} Wins reached ({self.won_trades_count}/{max_wins} wins)! Auto-trading STOPPED to secure profit.", "success")
+            self.is_auto_trading_enabled = False
+            return None
             
         # Cooldown check on this asset (handles standard cooldown and loss cooldowns)
         now_time = time.time()
@@ -1088,6 +1096,12 @@ class DerivAutoTrader:
                     self.won_trades_count += 1
                     self.consecutive_losses_count = 0
                     self.log_activity(f"🏆 CONTRACT WON! #{contract_id} on {trade['symbol']} | Profit: +${profit:.2f}", "success", trade)
+                    
+                    # Immediate shutdown if max daily wins target reached
+                    max_wins = int(self.config.get("max_daily_wins", 10000))
+                    if max_wins < 10000 and self.won_trades_count >= max_wins:
+                        self.is_auto_trading_enabled = False
+                        self.log_activity(f"🏆 2 WINS TARGET REACHED ({self.won_trades_count}/{max_wins} Wins)! Auto-trading STOPPED to secure profit.", "success")
                 else:
                     self.lost_trades_count += 1
                     self.consecutive_losses_count += 1
