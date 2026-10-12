@@ -65,7 +65,8 @@ DERIV_SYMBOL_MAP = {
 # Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
 BLACKLISTED_SYMBOLS = {
     "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
-    "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",  # Filtered out: low win rates / heavy trend drag
+    "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",
+    "USDJPY", "AUDUSD",  # Audited: 0% win rate on live ledger (-$2.50 drag)
     # Audited low win-rate synthetics (<45% on Deriv live)
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
@@ -73,7 +74,7 @@ BLACKLISTED_SYMBOLS = {
 # Whitelist for Autonomous Cloud Scanner (>65% Win Rate Pairs Only)
 AUTONOMOUS_WATCHLIST = [
     # Proven Champion Forex Pairs (Verified on live Deriv market candles)
-    "EURGBP", "EURUSD", "AUDUSD", "USDJPY",
+    "EURGBP", "EURUSD",
     # Commodities / Metals
     "SILVER", "GOLD",
 ]
@@ -106,15 +107,15 @@ class DerivAutoTrader:
             "min_confidence": 88.0,
             "preferred_duration": 15,
             "duration_unit": "m",
-            "take_profit_daily": 1.0,
-            "stop_loss_daily": 1.5,
-            "max_daily_trades": 10000,       # Take trades until TP ($1) or SL ($1.50) is hit
-            "max_daily_losses": 10000,       # Governed by $1.50 stop loss
+            "take_profit_daily": 10000.0,
+            "stop_loss_daily": 10000.0,
+            "max_daily_trades": 10000,
+            "max_daily_losses": 10000,
             "max_concurrent_trades": 1,
-            "cooldown_seconds": 60,
-            "allowed_market": "all",         # "all" (Forex + Synthetics 24/7), "forex", "synthetics", "metals"
-            "engine_version": "v5_sniper",   # V5 Forex Sniper (>70% Win Rate)
-            "account_mode": "real",          # Default: Real Options Account (ROT92728766)
+            "cooldown_seconds": 900,
+            "allowed_market": "all",
+            "engine_version": "v5_sniper",
+            "account_mode": "real",
         }
         
         # Runtime State & Performance
