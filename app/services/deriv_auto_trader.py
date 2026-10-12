@@ -64,19 +64,16 @@ DERIV_SYMBOL_MAP = {
 
 # Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
 BLACKLISTED_SYMBOLS = {
-    "GBPJPY", "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
+    "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
     "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",
     "USDJPY", "AUDUSD",  # Audited: 0% win rate on live ledger (-$2.50 drag)
     # Audited low win-rate synthetics (<45% on Deriv live)
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for Autonomous Cloud Scanner (>65% Win Rate Pairs Only)
+# Whitelist for Autonomous Cloud Scanner: Top 4 Proven Champions (>57% - 75% Win Rate)
 AUTONOMOUS_WATCHLIST = [
-    # Proven Champion Forex Pairs (Verified on live Deriv market candles)
-    "EURGBP", "EURUSD",
-    # Commodities / Metals
-    "SILVER", "GOLD",
+    "EURUSD", "GBPJPY", "GOLD", "EURGBP",
 ]
 
 
