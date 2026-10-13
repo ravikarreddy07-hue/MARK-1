@@ -849,7 +849,7 @@ class BinaryApp {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 22px; color: #94a3b8; font-size: 12px;">
-                        ⚡ New bot session active. Waiting for high-confluence signal (≥88%). Live trades will appear here instantly.
+                        ⚡ New bot session active. Waiting for high-confluence signal (≥85%). Live trades will appear here instantly.
                     </td>
                 </tr>
             `;
@@ -1211,7 +1211,7 @@ class BinaryApp {
                 this.engineVersion = selectedEngine;
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 0.5),
-                    min_confidence: parseInt(confInput?.value || 88),
+                    min_confidence: parseInt(confInput?.value || 85),
                     take_profit_daily: parseFloat(tpInput?.value || 10000.0),
                     stop_loss_daily: parseFloat(slInput?.value || 10000.0),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),
