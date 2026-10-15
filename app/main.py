@@ -669,6 +669,21 @@ async def deriv_disconnect():
     return await deriv_trader.disconnect()
 
 
+@app.get("/api/news/calendar")
+def get_economic_calendar(hours_ahead: int = Query(24, ge=1, le=72)):
+    """Returns high-impact economic news events and active 30-min blackout windows."""
+    try:
+        from app.services.news_filter import news_filter
+        return {
+            "success": True,
+            "blackout_window_minutes": 30,
+            "events": news_filter.get_upcoming_blackouts(hours_ahead=hours_ahead),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e), "events": []}
+
+
+
 # Mount static directory for frontend assets
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):

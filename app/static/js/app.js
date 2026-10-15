@@ -1435,6 +1435,15 @@ class BinaryApp {
             if (!this.isTogglingAutoTrading) {
                 this.updateBotToggleUi(!!data.is_auto_trading_enabled);
             }
+            const newsBadge = document.getElementById("news-blackout-badge");
+            if (newsBadge) {
+                const isBlackout = !!data.news_filter?.is_any_blackout_active;
+                newsBadge.style.display = isBlackout ? "inline-block" : "none";
+                if (isBlackout) {
+                    const ev = data.news_filter?.active_blackout_events?.[0];
+                    newsBadge.title = ev ? `${ev.country}: ${ev.title}` : "High-Impact Economic News";
+                }
+            }
             if (pnlEl) {
                 const pnl = data.stats?.daily_pnl || 0;
                 pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`;

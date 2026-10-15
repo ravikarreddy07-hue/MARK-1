@@ -685,6 +685,16 @@ class DerivAutoTrader:
         # Market Open Safeguard: Block trade if market is closed (e.g. Forex/Metals on weekends)
         if not self.is_market_open_for_asset(symbol):
             return None
+
+        # Economic News Blackout Safeguard: Block trades 30m before and 30m after High-Impact news
+        try:
+            from app.services.news_filter import news_filter
+            is_blackout, blackout_reason, _ = news_filter.is_in_news_blackout(symbol)
+            if is_blackout:
+                self.log_activity(f"📰 Auto-trade skipped on {symbol}: {blackout_reason}. Waiting for safe market conditions.", "info")
+                return None
+        except Exception:
+            pass
             
         # Risk Check: Daily Profit Target ($1.00)
         tp_target = float(self.config.get("take_profit_daily", 1.0))
@@ -990,6 +1000,19 @@ class DerivAutoTrader:
 
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
+        news_info = {}
+        try:
+            from app.services.news_filter import news_filter
+            upcoming = news_filter.get_upcoming_blackouts(hours_ahead=12)
+            active_blackouts = [u for u in upcoming if u.get("status") == "ACTIVE_BLACKOUT"]
+            news_info = {
+                "is_any_blackout_active": len(active_blackouts) > 0,
+                "active_blackout_events": active_blackouts,
+                "upcoming_events_count": len(upcoming),
+            }
+        except Exception:
+            pass
+
         return {
             "is_connected": self.is_connected,
             "is_authorized": self.is_authorized,
@@ -1008,6 +1031,7 @@ class DerivAutoTrader:
             },
             "active_contracts": list(self.active_contracts.values()),
             "is_forex_market_open": self.is_forex_market_open(),
+            "news_filter": news_info,
             "recent_activity": self.activity_log[:20],
         }
 

@@ -65,6 +65,19 @@ ENGINE_PRESETS = {
         "confidence_range":  25.0,
         "label": "V5 Forex Sniper (>70% Win Rate)",
     },
+    "v5": {
+        "min_bull_score":    6.8,
+        "min_bear_score":    6.8,
+        "min_lead":          1.5,
+        "adx_min":          10.0,
+        "pillars_required":    4,
+        "two_candle_confirm": True,
+        "session_filter":    False,
+        "require_mtf":       True,
+        "confidence_base":   72.0,
+        "confidence_range":  25.0,
+        "label": "V5 Forex Sniper (>70% Win Rate)",
+    },
     "v4": {
         # Alias pointing to high-accuracy V5 Forex Sniper (replaces dormant V4 Ultra)
         "min_bull_score":    6.8,
@@ -190,6 +203,15 @@ def evaluate_candle_signal(
     # ── UPGRADE 1: Session filter (controlled by preset) ──────────────────────
     if p_session and not is_active_session(t, asset_type):
         return _neutral(t, close_p, "Outside trading session (London/NY only for Forex)")
+
+    # ── High-Impact Economic News Blackout Gate (30m Before & 30m After) ────
+    try:
+        from app.services.news_filter import news_filter
+        is_news_blackout, news_reason, _ = news_filter.is_in_news_blackout(symbol, target_time=t)
+        if is_news_blackout:
+            return _neutral(t, close_p, news_reason or "Blocked by 30-min High-Impact News Blackout")
+    except Exception:
+        pass
 
 
     # ── Extract indicator arrays ──────────────────────────────────────────────
