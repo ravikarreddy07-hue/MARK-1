@@ -111,6 +111,7 @@ class DerivConfigRequest(BaseModel):
     max_daily_trades: Optional[int] = Field(None, ge=1, le=50000)
     max_daily_losses: Optional[int] = Field(None, ge=1, le=10000)
     max_daily_wins: Optional[int] = Field(None, ge=1, le=10000)
+    min_payout_rate: Optional[float] = Field(None, ge=0.5, le=1.0)
     max_concurrent_trades: Optional[int] = Field(None, ge=1, le=20)
     cooldown_seconds: Optional[int] = Field(None, ge=5, le=1800)
     allowed_market: Optional[str] = Field(None, pattern="^(all|forex|synthetics|metals)$")

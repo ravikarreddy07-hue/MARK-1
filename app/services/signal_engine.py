@@ -89,6 +89,7 @@ ENGINE_PRESETS = {
         "pillars_required":     4,
         "two_candle_confirm": True,
         "session_filter":     True,
+        "require_mtf":        True,
         "confidence_base":    68.0,
         "confidence_range":   28.0,
         "label": "V4.1 Balanced (More Signals / Still Filtered)",

@@ -104,16 +104,17 @@ class DerivAutoTrader:
             "min_confidence": 85.0,
             "preferred_duration": 15,
             "duration_unit": "m",
-            "take_profit_daily": 10000.0,
-            "stop_loss_daily": 10000.0,
-            "max_daily_trades": 10000,
-            "max_daily_losses": 10000,
+            "take_profit_daily": 1.0,
+            "stop_loss_daily": 1.0,
+            "max_daily_trades": 10,
+            "max_daily_losses": 2,
             "max_daily_wins": 2,
+            "min_payout_rate": 0.82,
             "max_concurrent_trades": 1,
             "cooldown_seconds": 900,
             "allowed_market": "all",
             "engine_version": "v4.1",
-            "account_mode": "real",
+            "account_mode": "demo",
         }
         
         # Runtime State & Performance
@@ -559,6 +560,17 @@ class DerivAutoTrader:
         payout = proposal_res.get("proposal", {}).get("payout", 0.0)
         ask_price = proposal_res.get("proposal", {}).get("ask_price", trade_stake)
         
+        # Check minimum payout rate (e.g. 82%) to prevent negative-EV broker drag
+        min_payout_rate = float(self.config.get("min_payout_rate", 0.82))
+        if ask_price > 0 and payout > ask_price:
+            calc_rate = (payout - ask_price) / ask_price
+            if calc_rate < min_payout_rate:
+                self.log_activity(
+                    f"⚠️ Trade skipped on {deriv_symbol}: Broker payout {calc_rate*100:.1f}% is below {min_payout_rate*100:.0f}% minimum threshold.",
+                    "warning"
+                )
+                return {"success": False, "error": f"Broker payout rate {calc_rate*100:.1f}% is below minimum {min_payout_rate*100:.0f}% threshold"}
+
         # 2. Buy Contract
         buy_req = {
             "buy": proposal_id,

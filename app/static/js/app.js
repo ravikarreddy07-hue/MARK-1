@@ -1212,10 +1212,10 @@ class BinaryApp {
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 0.5),
                     min_confidence: parseInt(confInput?.value || 85),
-                    take_profit_daily: parseFloat(tpInput?.value || 10000.0),
-                    stop_loss_daily: parseFloat(slInput?.value || 10000.0),
+                    take_profit_daily: parseFloat(tpInput?.value || 1.0),
+                    stop_loss_daily: parseFloat(slInput?.value || 1.0),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),
-                    max_daily_losses: parseInt(maxLossesInput?.value || 10000),
+                    max_daily_losses: parseInt(maxLossesInput?.value || 2),
                     allowed_market: marketInput?.value || "all",
                     engine_version: selectedEngine,
                 };
