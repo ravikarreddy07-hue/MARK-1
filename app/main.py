@@ -143,7 +143,7 @@ def get_market_data(
     bb_std: float = Query(2.0, gt=0.1, le=10.0),
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
-    engine: str = Query("v5_sniper", pattern="^(v4|v4.1|v5_sniper|v5)$", description="Engine preset (v5_sniper, v4.1, or v4)"),
+    engine: str = Query("v4.1", pattern="^(v4|v4.1|v5_sniper|v5)$", description="Engine preset (v4.1, v5_sniper, or v4)"),
     elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
@@ -227,7 +227,7 @@ def get_signal_at_time(
     bb_std: float = Query(2.0, gt=0.1, le=10.0),
     sma_period: int = Query(20, ge=2, le=200),
     ema_period: int = Query(50, ge=2, le=200),
-    engine: str = Query("v5_sniper", pattern="^(v4|v4.1|v5_sniper|v5)$"),
+    engine: str = Query("v4.1", pattern="^(v4|v4.1|v5_sniper|v5)$"),
     elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
@@ -251,7 +251,7 @@ def get_signal_at_time(
 
     idx = len(candles) - 1
     asset_type = detect_asset_type(symbol)
-    preset = ENGINE_PRESETS.get(engine.lower(), ENGINE_PRESETS["v5_sniper"])
+    preset = ENGINE_PRESETS.get(engine.lower(), ENGINE_PRESETS["v4.1"])
     sig_info = evaluate_candle_signal(
         idx=idx,
         candles=candles,
@@ -292,7 +292,7 @@ def get_backtest(
     ema_period: int = Query(50, ge=2, le=200),
     bb_period: int = Query(20, ge=2, le=200),
     bb_std: float = Query(2.0, gt=0.1, le=10.0),
-    engine: str = Query("v5_sniper", pattern="^(v4|v4.1|v5_sniper|v5)$"),
+    engine: str = Query("v4.1", pattern="^(v4|v4.1|v5_sniper|v5)$"),
     elite_mode: bool = Query(False, description="Enable Elite 80% Sniper Mode"),
 ):
     """
@@ -397,7 +397,7 @@ _SCANNER_CACHE: Dict[str, Any] = {}
 def get_scanner_signals(
     interval: str = Query("1m", pattern="^(1m|5m|15m|30m|1h|4h|1d)$"),
     market_filter: Optional[str] = Query(None, description="Forex, Crypto, Commodities, Indices, Stocks, Synthetics, high_conf, elite_forex"),
-    engine: str = Query("v5_sniper", pattern="^(v4|v4.1|v5_sniper|v5)$"),
+    engine: str = Query("v4.1", pattern="^(v4|v4.1|v5_sniper|v5)$"),
     elite_mode: bool = Query(False, description="Filter to Elite 80% Whitelist and Grade A+ Setups (>=80% conf)"),
 ):
     """

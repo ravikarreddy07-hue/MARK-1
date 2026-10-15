@@ -947,7 +947,7 @@ class DerivAutoTrader:
                             ind = compute_all_indicators(
                                 candles, rsi_period=9, macd_fast=12, macd_slow=26, macd_signal=9, bb_period=20, bb_std=2.0
                             )
-                            engine_ver = str(self.config.get("engine_version", "v5_sniper")).lower()
+                            engine_ver = str(self.config.get("engine_version", "v4.1")).lower()
                             sig_data = generate_all_signals(
                                 candles,
                                 ind,

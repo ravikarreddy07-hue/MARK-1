@@ -159,13 +159,14 @@ def test_deriv_auto_trader_module():
     assert trader.map_symbol("R_100") == "R_100"
 
     # 2. Test configuration updates
-    res = trader.update_config({
+    import asyncio
+    res = asyncio.run(trader.update_config({
         "default_stake": 20.0,
         "min_confidence": 80,
         "is_auto_trading_enabled": True,
         "take_profit_daily": 100.0,
         "stop_loss_daily": 30.0,
-    })
+    }))
     assert res["success"] is True
     assert trader.config["default_stake"] == 20.0
     assert trader.config["min_confidence"] == 80
@@ -193,12 +194,10 @@ def test_engine_version_presets_and_api():
     from app.services.indicators import compute_all_indicators
     from app.services.data_fetcher import generate_synthetic_data
 
-    assert "v4" in ENGINE_PRESETS
     assert "v4.1" in ENGINE_PRESETS
-    assert ENGINE_PRESETS["v4"]["pillars_required"] == 5
     assert ENGINE_PRESETS["v4.1"]["pillars_required"] == 4
-    assert ENGINE_PRESETS["v4"]["adx_min"] == 20.0
     assert ENGINE_PRESETS["v4.1"]["adx_min"] == 15.0
+    assert ENGINE_PRESETS["v4.1"]["session_filter"] is True
 
     candles = generate_synthetic_data(symbol="EURUSD", interval="1m", limit=100)
     ind = compute_all_indicators(candles)

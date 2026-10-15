@@ -122,7 +122,7 @@ class BinaryApp {
         this.activeTrade = null;
 
         this.settings = this.loadSettings();
-        this.engineVersion = "v5_sniper";
+        this.engineVersion = "v4.1";
         this.eliteMode = localStorage.getItem("qb_elite_mode") === "true";
         this.streamFilter = "all";
         this.streamData = [];
@@ -448,7 +448,7 @@ class BinaryApp {
         if (this.isLoadingSignals) return;
         this.isLoadingSignals = true;
         try {
-            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v5_sniper'}`);
+            const res = await fetch(`/api/scanner/signals?interval=${this.interval}&engine=${this.engineVersion || 'v4.1'}`);
             if (!res.ok) return;
             const data = await res.json();
             this.streamData = data.signals || [];
@@ -587,7 +587,7 @@ class BinaryApp {
                 bb_std: this.settings.bbStd,
                 sma_period: this.settings.smaPeriod,
                 ema_period: this.settings.emaPeriod,
-                engine: this.engineVersion || "v5_sniper",
+                engine: this.engineVersion || "v4.1",
                 elite_mode: this.eliteMode ? "true" : "false",
             });
 
@@ -645,8 +645,7 @@ class BinaryApp {
                 modelBadge.textContent = signal.status_label;
                 modelBadge.style.color = signal.status === "CONFIRMED" ? "var(--call-color)" : (signal.status === "FORMING" ? "#ffca28" : "var(--accent-blue)");
             } else {
-                const isV5 = (this.engineVersion || "").toLowerCase().includes("v5");
-                modelBadge.textContent = isV5 ? "V5 SNIPER CONFLUENCE" : "V4.1 AI CONFLUENCE";
+                modelBadge.textContent = "V4.1 AI CONFLUENCE";
             }
         }
 
@@ -983,7 +982,7 @@ class BinaryApp {
         const expiry = document.getElementById("bt-expiry-select")?.value || "5min";
 
         try {
-            const res = await fetch(`/api/backtest?symbol=${this.symbol}&timeframe=${this.interval}&expiry_duration=${expiry}&limit=${limit}&payout_rate=${this.settings.payoutRate}&stake=${this.settings.stake}&engine=${this.engineVersion || 'v5_sniper'}`);
+            const res = await fetch(`/api/backtest?symbol=${this.symbol}&timeframe=${this.interval}&expiry_duration=${expiry}&limit=${limit}&payout_rate=${this.settings.payoutRate}&stake=${this.settings.stake}&engine=${this.engineVersion || 'v4.1'}`);
             const data = await res.json();
 
 
