@@ -167,7 +167,7 @@ class BinaryApp {
             smaPeriod: 20,
             emaPeriod: 50,
             stake: 10.0,
-            payoutRate: 0.85,
+            payoutRate: 0.75,
         };
     }
 
@@ -1201,10 +1201,11 @@ class BinaryApp {
 
         const maxWinsInput = document.getElementById("deriv-max-wins-input");
         const maxLossesInput = document.getElementById("deriv-max-losses-input");
+        const minPayoutInput = document.getElementById("deriv-min-payout-input");
         const marketInput = document.getElementById("deriv-market-input");
         const engineInput = document.getElementById("deriv-engine-input");
 
-        [stakeInput, confInput, tpInput, slInput, maxWinsInput, maxLossesInput, marketInput, engineInput].forEach((inp) => {
+        [stakeInput, confInput, tpInput, slInput, maxWinsInput, maxLossesInput, minPayoutInput, marketInput, engineInput].forEach((inp) => {
             inp?.addEventListener("change", () => {
                 const selectedEngine = engineInput?.value || "v4.1";
                 this.engineVersion = selectedEngine;
@@ -1215,6 +1216,7 @@ class BinaryApp {
                     stop_loss_daily: parseFloat(slInput?.value || 1.0),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),
                     max_daily_losses: parseInt(maxLossesInput?.value || 2),
+                    min_payout_rate: parseFloat(minPayoutInput?.value || 75) / 100.0,
                     allowed_market: marketInput?.value || "all",
                     engine_version: selectedEngine,
                 };
@@ -1470,6 +1472,10 @@ class BinaryApp {
                 if (slInp && document.activeElement !== slInp && data.config.stop_loss_daily !== undefined) slInp.value = data.config.stop_loss_daily;
                 if (maxWInp && document.activeElement !== maxWInp && data.config.max_daily_wins !== undefined) maxWInp.value = data.config.max_daily_wins;
                 if (maxLInp && document.activeElement !== maxLInp && data.config.max_daily_losses !== undefined) maxLInp.value = data.config.max_daily_losses;
+                const minPayoutInp = document.getElementById("deriv-min-payout-input");
+                if (minPayoutInp && document.activeElement !== minPayoutInp && data.config.min_payout_rate !== undefined) {
+                    minPayoutInp.value = Math.round(data.config.min_payout_rate * 100);
+                }
                 const marketInp = document.getElementById("deriv-market-input");
                 if (marketInp && document.activeElement !== marketInp && data.config.allowed_market !== undefined) marketInp.value = data.config.allowed_market;
                 const engineInp = document.getElementById("deriv-engine-input");

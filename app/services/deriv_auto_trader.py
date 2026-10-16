@@ -109,7 +109,7 @@ class DerivAutoTrader:
             "max_daily_trades": 10,
             "max_daily_losses": 2,
             "max_daily_wins": 2,
-            "min_payout_rate": 0.82,
+            "min_payout_rate": 0.75,
             "max_concurrent_trades": 1,
             "cooldown_seconds": 900,
             "allowed_market": "all",
@@ -560,8 +560,8 @@ class DerivAutoTrader:
         payout = proposal_res.get("proposal", {}).get("payout", 0.0)
         ask_price = proposal_res.get("proposal", {}).get("ask_price", trade_stake)
         
-        # Check minimum payout rate (e.g. 82%) to prevent negative-EV broker drag
-        min_payout_rate = float(self.config.get("min_payout_rate", 0.82))
+        # Check minimum payout rate (e.g. 75%) to prevent negative-EV broker drag
+        min_payout_rate = float(self.config.get("min_payout_rate", 0.75))
         if ask_price > 0 and payout > ask_price:
             calc_rate = (payout - ask_price) / ask_price
             if calc_rate < min_payout_rate:
