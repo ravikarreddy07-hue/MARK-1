@@ -307,7 +307,7 @@ class DerivAutoTrader:
                 self.is_authorized = True
                 
                 # Start message receiving loop
-                if self._ws_task and not self._ws_task.done():
+                if self._ws_task and not self._ws_task.done() and self._ws_task != asyncio.current_task():
                     self._ws_task.cancel()
                 self._ws_task = asyncio.create_task(self._listen_loop())
                 
@@ -343,7 +343,7 @@ class DerivAutoTrader:
                 self.ws = await websockets.connect(legacy_url, open_timeout=25, ping_interval=30, ping_timeout=10)
                 self.is_connected = True
                 
-                if self._ws_task and not self._ws_task.done():
+                if self._ws_task and not self._ws_task.done() and self._ws_task != asyncio.current_task():
                     self._ws_task.cancel()
                 self._ws_task = asyncio.create_task(self._listen_loop())
                 
@@ -1082,19 +1082,17 @@ class DerivAutoTrader:
                 break
             except Exception as e:
                 logger.error(f"WebSocket listener loop error: {e}")
-                # Auto-reconnect if connection dropped unexpectedly
+                self.is_connected = False
+                self.is_authorized = False
+                self.ws = None
+                self.log_activity("WebSocket connection dropped. Reconnecting in 5s...", "warning")
+                await asyncio.sleep(5)
                 if self._running and self.api_token:
-                    self.is_connected = False
-                    self.is_authorized = False
-                    self.log_activity("WebSocket connection dropped. Reconnecting in 5s...", "warning")
-                    await asyncio.sleep(5)
                     try:
-                        await self.connect(self.api_token, self.app_id)
+                        asyncio.create_task(self.connect(self.api_token, self.app_id))
                     except Exception as re_err:
-                        logger.error(f"Auto-reconnect failed: {re_err}")
-                        await asyncio.sleep(10)
-                else:
-                    await asyncio.sleep(1)
+                        logger.error(f"Auto-reconnect task spawn failed: {re_err}")
+                break
 
     def _handle_open_contract_update(self, poc: Dict[str, Any]):
         """Processes real-time contract settlement (Win / Loss / Profit update)."""
