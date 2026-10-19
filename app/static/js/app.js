@@ -1133,7 +1133,7 @@ class BinaryApp {
         const slInput = document.getElementById("deriv-sl-input");
         const appIdField = document.getElementById("deriv-appid-input");
 
-        const defaultToken = "pat_543859a4eafd961283e1449a6efdb8f1a94a407aaed712a0d513261698888f30";
+        const defaultToken = "pat_5c171040860d6d9d1d722dc37b5165544842d854f45abcad7fa2f3a8be72bcbd";
         const defaultAppId = "34nZu00szxPcV0FfERyJF";
 
         // Restore saved app id & token, defaulting to active credentials
