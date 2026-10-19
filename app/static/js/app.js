@@ -406,15 +406,15 @@ class BinaryApp {
             btnApplyOptimal.addEventListener("click", () => this.applyOptimalParameters());
         }
 
-        // Manual Refresh / Sync Trade History
+        // Manual Refresh Trade History
         const btnRefreshTrades = document.getElementById("btn-refresh-trades");
         if (btnRefreshTrades) {
             btnRefreshTrades.addEventListener("click", async () => {
                 const oldText = btnRefreshTrades.textContent;
-                btnRefreshTrades.textContent = "⏳ Syncing...";
+                btnRefreshTrades.textContent = "⏳ Refreshing...";
                 await this.loadTradeHistory(true);
                 btnRefreshTrades.textContent = oldText;
-                this.showToast("📋 Trade History synchronized with Deriv broker.", "info");
+                this.showToast("📋 Trade History refreshed.", "info");
             });
         }
 
@@ -422,7 +422,7 @@ class BinaryApp {
         const btnRestartBot = document.getElementById("btn-restart-bot-session");
         if (btnRestartBot) {
             btnRestartBot.addEventListener("click", async () => {
-                if (!confirm("Are you sure you want to RESTART the bot? This will reconnect the bot, reset session counters, and refresh the trade history.")) {
+                if (!confirm("Are you sure you want to RESTART the bot? This will reconnect the bot, reset session counters, and clean trade history to 0.")) {
                     return;
                 }
                 const oldText = btnRestartBot.textContent;
@@ -431,7 +431,7 @@ class BinaryApp {
                 try {
                     const res = await fetch("/api/deriv/restart", { method: "POST" });
                     const data = await res.json();
-                    this.showToast("🔄 Bot session restarted! Trade history refreshed.", "win");
+                    this.showToast("🔄 Bot restarted! Trade history cleaned to 0 trades.", "win");
                     await this.loadTradeHistory(true);
                     await this.pollDerivStatus();
                 } catch (e) {
@@ -849,8 +849,7 @@ class BinaryApp {
         if (this.isLoadingTrades) return;
         this.isLoadingTrades = true;
         try {
-            const url = force ? "/api/trades?sync_broker=true" : "/api/trades";
-            const res = await fetch(url);
+            const res = await fetch("/api/trades");
             if (!res.ok) return;
             const trades = await res.json();
             this.renderTradeTable(trades, force);
@@ -881,7 +880,7 @@ class BinaryApp {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align: center; padding: 22px; color: #94a3b8; font-size: 12px;">
-                        ⚡ New bot session active. Waiting for high-confluence signal (≥85%). Live trades will appear here instantly.
+                        ⚡ Fresh bot session active (0 trades). Trades executed between bot start and stop today will appear here automatically.
                     </td>
                 </tr>
             `;
@@ -1380,7 +1379,11 @@ class BinaryApp {
             this.updateBotToggleUi(actualState);
 
             if (actualState) {
-                this.showToast("⚡ Deriv Auto-Trading is ON (ACTIVE)! Monitoring high-confluence setups.", "win");
+                try {
+                    await fetch("/api/trades", { method: "DELETE" });
+                    await this.loadTradeHistory(true);
+                } catch (e) {}
+                this.showToast("⚡ Deriv Auto-Trading is ON! Cleaned to 0 trades for fresh run.", "win");
             } else {
                 this.showToast("🛑 Deriv Auto-Trading is OFF / PAUSED.", "info");
             }

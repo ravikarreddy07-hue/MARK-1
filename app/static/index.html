@@ -275,7 +275,7 @@
                         <span style="font-size: 11px; color: var(--text-secondary);">Net PnL: <strong id="net-pnl-display" style="color: var(--call-color); font-size: 12px;">+$0.00</strong></span>
                     </div>
                     <div style="display: flex; gap: 6px;">
-                        <button id="btn-refresh-trades" class="btn-secondary" style="font-size: 10px; padding: 3px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; cursor: pointer;" title="Synchronize latest trade history from Deriv broker">🔄 Sync Broker Trades</button>
+                        <button id="btn-refresh-trades" class="btn-secondary" style="font-size: 10px; padding: 3px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; cursor: pointer;" title="Refresh trade history table">🔄 Refresh Trades</button>
                         <button id="btn-clear-trades" class="btn-ghost" style="font-size: 10px; padding: 3px 8px;">Clear History</button>
                     </div>
                 </div>
@@ -297,8 +297,8 @@
                         </thead>
                         <tbody id="trade-history-tbody">
                             <tr>
-                                <td colspan="9" style="text-align: center; padding: 20px; color: var(--text-muted);">
-                                    No trades executed yet today. Live trades from Deriv and manual execution will appear here.
+                                <td colspan="9" style="text-align: center; padding: 22px; color: #94a3b8; font-size: 12px;">
+                                    ⚡ Fresh bot session active (0 trades). Trades executed between bot start and stop today will appear here automatically.
                                 </td>
                             </tr>
                         </tbody>

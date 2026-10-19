@@ -528,15 +528,8 @@ def get_optimize(
 # ─── TRADES & LOCAL JOURNAL ENDPOINTS ─────────────────────────────────────────
 
 @app.get("/api/trades")
-async def get_trades(sync_broker: bool = False):
-    """Returns all recorded trades merged with active Deriv contracts."""
-    # If explicitly requested or if trade manager is currently empty and deriv is authorized, sync from broker!
-    if (sync_broker or len(trade_manager.trades) == 0) and getattr(deriv_trader, "is_authorized", False):
-        try:
-            await deriv_trader.sync_recent_trades_from_broker(limit=10)
-        except Exception as e:
-            logger.error(f"Error auto-syncing broker trades: {e}")
-
+def get_trades():
+    """Returns all recorded trades for the current bot session merged with active Deriv contracts."""
     trades = list(trade_manager.get_all_trades())
     existing_ids = {str(t.get("deriv_contract_id") or t.get("id")) for t in trades}
     
@@ -621,14 +614,15 @@ def update_trade(trade_id: str, req: TradeUpdateRequest):
 
 @app.delete("/api/trades")
 def clear_trades():
-    """Clears trade journal and resets session stats."""
+    """Clears trade journal and resets session stats to 0."""
     trade_manager.clear_history()
     deriv_trader.daily_pnl = 0.0
     deriv_trader.total_trades_count = 0
     deriv_trader.won_trades_count = 0
     deriv_trader.lost_trades_count = 0
     deriv_trader.consecutive_losses_count = 0
-    return {"message": "Trade history cleared and session reset"}
+    deriv_trader.active_contracts.clear()
+    return {"message": "Trade history cleaned to 0 and session reset"}
 
 
 # ─── DERIV AUTOMATED TRADING BOT ENDPOINTS ────────────────────────────────────
