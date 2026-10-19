@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 from typing import Dict, Any, Optional, List, Callable
 import requests
@@ -322,6 +323,7 @@ class DerivAutoTrader:
                     f"🟢 Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}",
                     "success"
                 )
+                asyncio.create_task(self.sync_recent_trades_from_broker(limit=10))
 
                 # Persist credentials for automatic server reboot recovery
                 try:
@@ -379,6 +381,7 @@ class DerivAutoTrader:
                 
                 acct_type = "DEMO" if self.account_info["is_virtual"] else "REAL"
                 self.log_activity(f"🟢 Connected & Authorized ({acct_type}): {self.account_info['loginid']} | Balance: ${self.account_info['balance']:.2f} {self.account_info['currency']}", "success")
+                asyncio.create_task(self.sync_recent_trades_from_broker(limit=10))
                 
                 return {
                     "success": True,
@@ -412,6 +415,114 @@ class DerivAutoTrader:
         self.log_activity("Disconnected from Deriv API. Auto-trading paused.", "info")
         return {"success": True, "message": "Disconnected successfully"}
 
+    async def restart_bot_session(self) -> Dict[str, Any]:
+        """
+        Explicitly restarts the bot session and resets session counters and trade history.
+        Only executed when the user explicitly triggers a bot restart.
+        """
+        from app.services.trade_manager import trade_manager
+        trade_manager.clear_history()
+        self.daily_pnl = 0.0
+        self.total_trades_count = 0
+        self.won_trades_count = 0
+        self.lost_trades_count = 0
+        self.consecutive_losses_count = 0
+        self.log_activity("🔄 Bot session restarted by user. Session counters and trade history reset.", "warning")
+
+        # Cleanly reconnect WebSocket session
+        clean_token = self.api_token or DEFAULT_DERIV_TOKEN
+        clean_app_id = self.app_id or DEFAULT_DERIV_APP_ID
+        connect_res = await self.connect(clean_token, clean_app_id)
+        if connect_res.get("success"):
+            # Sync fresh 10 trades from broker
+            await self.sync_recent_trades_from_broker(limit=10)
+
+        return {
+            "success": True,
+            "message": "Bot session restarted successfully.",
+            "is_connected": self.is_connected,
+            "is_authorized": self.is_authorized,
+            "account": self.account_info,
+            "daily_stats": {
+                "daily_pnl": self.daily_pnl,
+                "won_trades": self.won_trades_count,
+                "lost_trades": self.lost_trades_count,
+            }
+        }
+
+    async def sync_recent_trades_from_broker(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Fetches the recent completed trades from Deriv broker profit_table
+        and integrates them into TradeManager so they appear on the website.
+        """
+        if not self.is_authorized or not self.ws:
+            return []
+        try:
+            req = {"profit_table": 1, "description": 1, "limit": limit, "sort": "DESC"}
+            res = await self._send_request(req)
+            txs = res.get("profit_table", {}).get("transactions", [])
+            if not txs:
+                return []
+
+            from app.services.trade_manager import trade_manager
+            with trade_manager._lock:
+                existing_ids = {str(t.get("deriv_contract_id") or t.get("id")) for t in trade_manager.trades}
+                added = 0
+                for t in txs:
+                    cid = str(t.get("contract_id", ""))
+                    if not cid or cid in existing_ids:
+                        continue
+
+                    buy = float(t.get("buy_price", 0.5))
+                    sell = float(t.get("sell_price", 0.0))
+                    pnl = round(sell - buy, 2)
+                    outcome = "WIN" if pnl > 0 else "LOSS"
+
+                    longcode = t.get("longcode", "")
+                    symbol_match = re.search(r'if\s+(.+?)\s+is strictly', longcode)
+                    if symbol_match:
+                        asset_name = symbol_match.group(1).strip()
+                    else:
+                        asset_name = t.get("underlying_symbol", "DERIV")
+
+                    sig = str(t.get("contract_type", "CALL")).upper()
+                    p_time = int(t.get("purchase_time", time.time()))
+                    s_time = int(t.get("sell_time", p_time + 900))
+                    dur_sec = max(60, s_time - p_time)
+                    dur_label = f"{round(dur_sec / 60)}m" if dur_sec >= 60 else f"{dur_sec}s"
+                    rate = round((sell - buy) / buy, 2) if buy > 0 else 0.85
+
+                    trade_item = {
+                        "id": cid,
+                        "deriv_contract_id": cid,
+                        "symbol": asset_name,
+                        "timeframe": dur_label,
+                        "signal": sig,
+                        "entry_time": p_time,
+                        "expiry_time": s_time,
+                        "duration_seconds": dur_sec,
+                        "entry_price": None,
+                        "exit_price": None,
+                        "stake": buy,
+                        "payout_rate": rate,
+                        "pnl": pnl,
+                        "status": "CLOSED",
+                        "outcome": outcome,
+                    }
+                    trade_manager.trades.append(trade_item)
+                    existing_ids.add(cid)
+                    added += 1
+
+                if added > 0:
+                    trade_manager.trades.sort(key=lambda x: x.get("entry_time", 0), reverse=True)
+                    trade_manager._save()
+                    logger.info(f"Synchronized {added} broker trades into TradeManager.")
+
+            return list(trade_manager.trades)
+        except Exception as e:
+            logger.error(f"Error syncing recent broker trades: {e}")
+            return []
+
     async def update_config(self, new_config: Dict[str, Any]) -> Dict[str, Any]:
         """Updates trading parameters and risk management limits."""
         prev_mode = self.config.get("account_mode", "demo")
@@ -434,19 +545,7 @@ class DerivAutoTrader:
             status_str = "ACTIVE ⚡ (Cloud 24/7)" if self.is_auto_trading_enabled else "PAUSED ⏸️"
             self.log_activity(f"Auto-Trading switched to: {status_str}", "info")
 
-            # Automatically refresh/clear trade history and session stats whenever starting auto bot
-            if self.is_auto_trading_enabled:
-                try:
-                    from app.services.trade_manager import trade_manager
-                    trade_manager.clear_history()
-                    self.daily_pnl = 0.0
-                    self.total_trades_count = 0
-                    self.won_trades_count = 0
-                    self.lost_trades_count = 0
-                    self.consecutive_losses_count = 0
-                    self.log_activity("🧹 Trade history refreshed for new auto-trading session.", "info")
-                except Exception as clear_err:
-                    logger.error(f"Error resetting trade history: {clear_err}")
+            # Note: Trade history and counters are preserved across toggles and only reset upon explicit bot restart
 
         # Persist config and auto-trading state to file
         try:

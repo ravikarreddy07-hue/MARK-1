@@ -528,8 +528,15 @@ def get_optimize(
 # ─── TRADES & LOCAL JOURNAL ENDPOINTS ─────────────────────────────────────────
 
 @app.get("/api/trades")
-def get_trades():
+async def get_trades(sync_broker: bool = False):
     """Returns all recorded trades merged with active Deriv contracts."""
+    # If explicitly requested or if trade manager is currently empty and deriv is authorized, sync from broker!
+    if (sync_broker or len(trade_manager.trades) == 0) and getattr(deriv_trader, "is_authorized", False):
+        try:
+            await deriv_trader.sync_recent_trades_from_broker(limit=10)
+        except Exception as e:
+            logger.error(f"Error auto-syncing broker trades: {e}")
+
     trades = list(trade_manager.get_all_trades())
     existing_ids = {str(t.get("deriv_contract_id") or t.get("id")) for t in trades}
     
@@ -646,6 +653,16 @@ async def update_deriv_config(req: DerivConfigRequest):
     """Updates auto-trading parameters and risk rules."""
     config_updates = req.model_dump(exclude_unset=True)
     return await deriv_trader.update_config(config_updates)
+
+
+@app.post("/api/deriv/restart")
+async def deriv_restart():
+    """
+    Explicitly restarts the Deriv Bot session.
+    Resets session counters and refreshes trade history ONLY upon explicit restart.
+    """
+    res = await deriv_trader.restart_bot_session()
+    return res
 
 
 @app.post("/api/deriv/trade")

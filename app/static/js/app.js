@@ -406,15 +406,40 @@ class BinaryApp {
             btnApplyOptimal.addEventListener("click", () => this.applyOptimalParameters());
         }
 
-        // Manual Refresh Trade History
+        // Manual Refresh / Sync Trade History
         const btnRefreshTrades = document.getElementById("btn-refresh-trades");
         if (btnRefreshTrades) {
             btnRefreshTrades.addEventListener("click", async () => {
                 const oldText = btnRefreshTrades.textContent;
-                btnRefreshTrades.textContent = "⏳ Refreshing...";
-                await this.loadTradeHistory();
+                btnRefreshTrades.textContent = "⏳ Syncing...";
+                await this.loadTradeHistory(true);
                 btnRefreshTrades.textContent = oldText;
-                this.showToast("📋 Trade History updated manually.", "info");
+                this.showToast("📋 Trade History synchronized with Deriv broker.", "info");
+            });
+        }
+
+        // Restart Bot Session Button
+        const btnRestartBot = document.getElementById("btn-restart-bot-session");
+        if (btnRestartBot) {
+            btnRestartBot.addEventListener("click", async () => {
+                if (!confirm("Are you sure you want to RESTART the bot? This will reconnect the bot, reset session counters, and refresh the trade history.")) {
+                    return;
+                }
+                const oldText = btnRestartBot.textContent;
+                btnRestartBot.disabled = true;
+                btnRestartBot.textContent = "⏳ Restarting...";
+                try {
+                    const res = await fetch("/api/deriv/restart", { method: "POST" });
+                    const data = await res.json();
+                    this.showToast("🔄 Bot session restarted! Trade history refreshed.", "win");
+                    await this.loadTradeHistory(true);
+                    await this.pollDerivStatus();
+                } catch (e) {
+                    this.showToast("Failed to restart bot: " + e.message, "loss");
+                } finally {
+                    btnRestartBot.disabled = false;
+                    btnRestartBot.textContent = oldText;
+                }
             });
         }
 
@@ -424,7 +449,7 @@ class BinaryApp {
             btnClearTrades.addEventListener("click", async () => {
                 if (confirm("Are you sure you want to clear all trade logs?")) {
                     await fetch("/api/trades", { method: "DELETE" });
-                    await this.loadTradeHistory();
+                    await this.loadTradeHistory(true);
                     this.showToast("Trade history cleared", "info");
                 }
             });
@@ -820,14 +845,15 @@ class BinaryApp {
         } catch (e) {}
     }
 
-    async loadTradeHistory() {
+    async loadTradeHistory(force = false) {
         if (this.isLoadingTrades) return;
         this.isLoadingTrades = true;
         try {
-            const res = await fetch("/api/trades");
+            const url = force ? "/api/trades?sync_broker=true" : "/api/trades";
+            const res = await fetch(url);
             if (!res.ok) return;
             const trades = await res.json();
-            this.renderTradeTable(trades);
+            this.renderTradeTable(trades, force);
         } catch (err) {
             console.error("Load trades error:", err);
         } finally {
@@ -835,12 +861,19 @@ class BinaryApp {
         }
     }
 
-    renderTradeTable(trades) {
+    renderTradeTable(trades, force = false) {
         const tbody = document.getElementById("trade-history-tbody");
         const winRatePill = document.getElementById("win-rate-pill");
         const pnlDisplay = document.getElementById("net-pnl-display");
         const activeCountPill = document.getElementById("active-trades-count-pill");
         if (!tbody) return;
+
+        // Prevent DOM flickering if trade records have not changed
+        const sig = JSON.stringify(trades);
+        if (!force && this._lastTradesSig === sig) {
+            return;
+        }
+        this._lastTradesSig = sig;
 
         tbody.innerHTML = "";
 
@@ -1347,14 +1380,9 @@ class BinaryApp {
             this.updateBotToggleUi(actualState);
 
             if (actualState) {
-                // When turned ON: History changes every time! Clear old session and start fresh
-                try {
-                    await fetch("/api/trades", { method: "DELETE" });
-                    await this.loadTradeHistory();
-                } catch (e) {}
-                this.showToast("⚡ Deriv Auto-Trading is ON! Fresh session started.", "win");
+                this.showToast("⚡ Deriv Auto-Trading is ON (ACTIVE)! Monitoring high-confluence setups.", "win");
             } else {
-                this.showToast("🛑 Deriv Auto-Trading is OFF / PAUSED.", "loss");
+                this.showToast("🛑 Deriv Auto-Trading is OFF / PAUSED.", "info");
             }
         } catch (err) {
             console.error("Failed to toggle auto-trading:", err);

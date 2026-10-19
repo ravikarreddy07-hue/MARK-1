@@ -187,6 +187,9 @@
                                     <button id="btn-toggle-bot-state" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer; border-radius: 6px; background: rgba(255, 61, 87, 0.2); color: #ff3d57; border-color: rgba(255, 61, 87, 0.5);">
                                         🛑 STOP BOT
                                     </button>
+                                    <button id="btn-restart-bot-session" class="btn-secondary" style="font-size: 11px; padding: 4px 10px; font-weight: 700; cursor: pointer; border-radius: 6px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.5);" title="Restart bot session, reset counters, and refresh trade history">
+                                        🔄 RESTART BOT
+                                    </button>
                                     <label class="switch" style="cursor: pointer;" title="Toggle Auto Trading">
                                         <input type="checkbox" id="deriv-auto-switch" checked>
                                         <span class="slider round"></span>
@@ -272,7 +275,7 @@
                         <span style="font-size: 11px; color: var(--text-secondary);">Net PnL: <strong id="net-pnl-display" style="color: var(--call-color); font-size: 12px;">+$0.00</strong></span>
                     </div>
                     <div style="display: flex; gap: 6px;">
-                        <button id="btn-refresh-trades" class="btn-secondary" style="font-size: 10px; padding: 3px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; cursor: pointer;">🔄 Refresh History</button>
+                        <button id="btn-refresh-trades" class="btn-secondary" style="font-size: 10px; padding: 3px 8px; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.5); color: #60a5fa; cursor: pointer;" title="Synchronize latest trade history from Deriv broker">🔄 Sync Broker Trades</button>
                         <button id="btn-clear-trades" class="btn-ghost" style="font-size: 10px; padding: 3px 8px;">Clear History</button>
                     </div>
                 </div>
