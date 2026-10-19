@@ -211,7 +211,10 @@ class DerivAutoTrader:
         resp = requests.get(accts_url, headers=headers, timeout=10)
         if resp.status_code != 200:
             err_data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
-            err_msg = err_data.get("message") or err_data.get("error", {}).get("message") or f"HTTP {resp.status_code}"
+            body_text = resp.text.strip() if resp.text else ""
+            err_msg = err_data.get("message") or err_data.get("error", {}).get("message") or body_text or f"HTTP {resp.status_code}"
+            if resp.status_code == 401 or "invalid" in err_msg.lower() or "expired" in err_msg.lower():
+                return {"success": False, "error": f"Deriv Token has Expired or is Invalid ({err_msg}). Please generate a fresh token on Deriv and click Connect Bot."}
             return {"success": False, "error": f"Failed to retrieve Deriv accounts: {err_msg}"}
             
         data = resp.json().get("data", [])
