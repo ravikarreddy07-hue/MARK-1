@@ -51,12 +51,13 @@ class EconomicNewsFilter:
     def fetch_calendar_events(self) -> List[Dict[str, Any]]:
         """Fetches and parses high-impact economic news from ForexFactory public JSON."""
         now = time.time()
-        if self.cached_events and (now - self.last_fetch_time < self.cache_ttl):
+        if now - self.last_fetch_time < self.cache_ttl:
             return self.cached_events
 
+        self.last_fetch_time = now  # Guarantee throttle even if request fails
         try:
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutonomousTrader/3.0"}
-            resp = requests.get(FF_CALENDAR_URL, headers=headers, timeout=8)
+            resp = requests.get(FF_CALENDAR_URL, headers=headers, timeout=2.0)
             if resp.status_code == 200:
                 raw_events = resp.json()
                 parsed = []
@@ -77,11 +78,15 @@ class EconomicNewsFilter:
                         except Exception:
                             continue
                 self.cached_events = parsed
-                self.last_fetch_time = now
                 logger.info(f"Updated economic calendar: loaded {len(parsed)} High-Impact events.")
                 return parsed
+            else:
+                # If non-200 (e.g. 403), back off for 10 minutes before next attempt
+                self.last_fetch_time = now - self.cache_ttl + 600.0
         except Exception as e:
-            logger.warning(f"Could not fetch ForexFactory calendar: {e}. Using cached events if available.")
+            logger.warning(f"Could not fetch ForexFactory calendar: {e}. Using cached events.")
+            # On network error or timeout, back off for 5 minutes
+            self.last_fetch_time = now - self.cache_ttl + 300.0
 
         return self.cached_events
 
