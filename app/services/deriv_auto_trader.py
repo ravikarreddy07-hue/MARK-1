@@ -102,7 +102,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 0.5,
-            "min_confidence": 85.0,
+            "min_confidence": 80.0,
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 1.0,
@@ -709,7 +709,7 @@ class DerivAutoTrader:
             return None
 
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 85.0))
+        min_conf = float(self.config.get("min_confidence", 80.0))
         if confidence < min_conf:
             return None
             

@@ -215,7 +215,7 @@ class BinaryApp {
         this.updateEliteSniperUI();
         if (this.eliteMode) {
             this.showToast("🎯 Option B: Elite 80% Sniper Mode ACTIVATED (Macro MTF + 80%+ Conf Gate)", "win");
-            this.updateDerivConfig({ min_confidence: 85 });
+            this.updateDerivConfig({ min_confidence: 80 });
         } else {
             this.showToast("Elite Sniper Mode Deactivated. Returned to Standard Filters.", "info");
         }
@@ -1243,7 +1243,7 @@ class BinaryApp {
                 this.engineVersion = selectedEngine;
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 0.5),
-                    min_confidence: parseInt(confInput?.value || 85),
+                    min_confidence: parseInt(confInput?.value || 80),
                     take_profit_daily: parseFloat(tpInput?.value || 1.0),
                     stop_loss_daily: parseFloat(slInput?.value || 1.0),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),
