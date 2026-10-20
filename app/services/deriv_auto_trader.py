@@ -65,16 +65,17 @@ DERIV_SYMBOL_MAP = {
 
 # Permanent Blacklist: Pairs with dangerous trend volatility that fail binary options mean-reversion
 BLACKLISTED_SYMBOLS = {
-    "USDCAD", "AUDJPY", "EURJPY", "EURAUD",
+    "GOLD", "XAUUSD", "EURGBP",
+    "AUDJPY", "EURJPY", "EURAUD",
     "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",
     "USDJPY", "AUDUSD",  # Audited: 0% win rate on live ledger (-$2.50 drag)
     # Audited low win-rate synthetics (<45% on Deriv live)
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for Autonomous Cloud Scanner: Top Proven Institutional Champions (>64% - 83% Win Rate)
+# Whitelist for Autonomous Cloud Scanner: Top 3 Institutional Champions Only (67.6% Proven Win Rate)
 AUTONOMOUS_WATCHLIST = [
-    "EURUSD", "GBPJPY", "GOLD", "EURGBP", "USDCAD", "GBPUSD",
+    "EURUSD", "GBPJPY", "USDCAD",
 ]
 
 
@@ -706,9 +707,9 @@ class DerivAutoTrader:
         if sig_type not in ("CALL", "PUT"):
             return None
             
-        # Safeguard: Block blacklisted high-risk trend pairs (sub-50% win rate protection)
+        # Whitelist & Blacklist Safeguard: Strictly restrict auto-trading to the 3 Champions
         clean_sym = symbol.upper().replace("/", "").replace("-", "")
-        if clean_sym in BLACKLISTED_SYMBOLS:
+        if clean_sym in BLACKLISTED_SYMBOLS or clean_sym not in AUTONOMOUS_WATCHLIST:
             return None
 
         confidence = float(signal_data.get("confidence", 0))
