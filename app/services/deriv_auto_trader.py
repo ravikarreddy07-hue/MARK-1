@@ -598,16 +598,19 @@ class DerivAutoTrader:
         payout = proposal_res.get("proposal", {}).get("payout", 0.0)
         ask_price = proposal_res.get("proposal", {}).get("ask_price", trade_stake)
         
-        # Check minimum payout rate (e.g. 75%) to prevent negative-EV broker drag
-        min_payout_rate = float(self.config.get("min_payout_rate", 0.75))
+        # Check minimum payout rate (75% default for Forex, 60% for Gold/Metals)
+        default_min_rate = float(self.config.get("min_payout_rate", 0.75))
+        is_metal = "XAU" in deriv_symbol or "XAG" in deriv_symbol or symbol.upper() in ("GOLD", "SILVER")
+        required_payout = min(0.60, default_min_rate) if is_metal else default_min_rate
+
         if ask_price > 0 and payout > ask_price:
             calc_rate = (payout - ask_price) / ask_price
-            if calc_rate < min_payout_rate:
+            if calc_rate < required_payout:
                 self.log_activity(
-                    f"⚠️ Trade skipped on {deriv_symbol}: Broker payout {calc_rate*100:.1f}% is below {min_payout_rate*100:.0f}% minimum threshold.",
+                    f"⚠️ Trade skipped on {deriv_symbol}: Broker payout {calc_rate*100:.1f}% is below {required_payout*100:.0f}% minimum threshold.",
                     "warning"
                 )
-                return {"success": False, "error": f"Broker payout rate {calc_rate*100:.1f}% is below minimum {min_payout_rate*100:.0f}% threshold"}
+                return {"success": False, "error": f"Broker payout rate {calc_rate*100:.1f}% is below minimum {required_payout*100:.0f}% threshold"}
 
         # 2. Buy Contract
         buy_req = {
