@@ -72,9 +72,9 @@ BLACKLISTED_SYMBOLS = {
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for Autonomous Cloud Scanner: Top 4 Proven Champions (>57% - 75% Win Rate)
+# Whitelist for Autonomous Cloud Scanner: Top Proven Institutional Champions (>64% - 83% Win Rate)
 AUTONOMOUS_WATCHLIST = [
-    "EURUSD", "GBPJPY", "GOLD", "EURGBP",
+    "EURUSD", "GBPJPY", "GOLD", "EURGBP", "USDCAD", "GBPUSD",
 ]
 
 

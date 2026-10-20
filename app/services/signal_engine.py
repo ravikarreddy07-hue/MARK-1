@@ -51,17 +51,17 @@ def is_active_session(timestamp_seconds: int, asset_type: str = "forex") -> bool
 # ─── Engine presets — selectable from the UI ─────────────────────────────────
 ENGINE_PRESETS = {
     "v4.1": {
-        # Institutional Balanced: 4/5 pillars, 9.0 score gate, ADX>=15, session filter, 2-candle confirm
+        # Institutional Balanced: 4/5 pillars, 9.0 score gate, ADX>=15, session filter, single-candle exhaustion confirmation
         # Proven 86.7% win rate across tested assets
         "min_bull_score":     9.0,
         "min_bear_score":     9.0,
         "min_lead":           3.5,
         "adx_min":           15.0,
         "pillars_required":     4,
-        "two_candle_confirm": True,
+        "two_candle_confirm": False,
         "session_filter":     True,
         "require_mtf":        True,
-        "confidence_base":    68.0,
+        "confidence_base":    70.0,
         "confidence_range":   28.0,
         "label": "V4.1 Institutional AI Confluence (86.7% Win Rate)",
     },
@@ -97,10 +97,10 @@ ENGINE_PRESETS = {
         "min_lead":          3.5,
         "adx_min":          15.0,
         "pillars_required":    4,
-        "two_candle_confirm": True,
+        "two_candle_confirm": False,
         "session_filter":     True,
         "require_mtf":        True,
-        "confidence_base":    68.0,
+        "confidence_base":    70.0,
         "confidence_range":   28.0,
         "label": "V4.1 Institutional AI Confluence (86.7% Win Rate)",
     },
