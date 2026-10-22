@@ -128,6 +128,7 @@ class DerivAutoTrader:
         self.active_contracts: Dict[str, Any] = {}
         self.trade_cooldowns: Dict[str, float] = {}
         self.activity_log: List[Dict[str, Any]] = []
+        self._last_daily_scheduler_date: Optional[str] = None
         
         self._ws_task = None
         self._running = False
@@ -1040,6 +1041,58 @@ class DerivAutoTrader:
             # Sleep 3 minutes (180s) - well below Render's 15-min limit to guarantee 24/7 zero-sleep uptime
             await asyncio.sleep(180)
 
+    async def run_daily_scheduler(self):
+        """
+        Autonomous Daily Morning Scheduler (09:00 AM IST):
+        Runs 24/7 on the cloud server. Every day at 09:00 AM IST:
+        - Regardless of whether the bot stopped after hitting Stop-Loss or Take-Profit,
+          or did not hit any target yesterday:
+        - Automatically resets daily PnL, wins, losses, trade counts to 0.
+        - Automatically clears trade history table on the website cleanly to 0.
+        - Automatically turns Auto-Trading ON (ACTIVE ⚡).
+        - Re-authenticates with Deriv for a clean fresh session.
+        """
+        logger.info("Autonomous Daily Morning Scheduler initialized (Target: 09:00 AM IST every day).")
+        ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+        
+        while True:
+            try:
+                now_ist = datetime.datetime.now(ist_tz)
+                today_str = now_ist.strftime("%Y-%m-%d")
+
+                # Trigger window: 09:00 to 09:05 AM IST, once per calendar day
+                if now_ist.hour == 9 and 0 <= now_ist.minute <= 5:
+                    if getattr(self, "_last_daily_scheduler_date", None) != today_str:
+                        self._last_daily_scheduler_date = today_str
+                        logger.info(f"🌅 Executing Daily Morning Refresh for {today_str} at {now_ist.strftime('%H:%M:%S')} IST...")
+                        
+                        # 1. Reset counters and clear trade history
+                        await self.restart_bot_session()
+                        
+                        # 2. Force Auto-Trading ON (unlocks from previous day's SL/TP pause)
+                        self.is_auto_trading_enabled = True
+                        
+                        # 3. Persist active state to credentials file
+                        try:
+                            existing = {}
+                            if os.path.exists(CREDENTIALS_FILE):
+                                with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+                                    existing = json.load(f)
+                            existing["is_auto_trading_enabled"] = True
+                            with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+                                json.dump(existing, f)
+                        except Exception:
+                            pass
+                            
+                        self.log_activity(
+                            f"🌅 Daily Morning Refresh (09:00 AM IST): Fresh trading session initialized for {today_str}. Auto-trading ACTIVE ⚡. Trade history cleaned to 0.",
+                            "success"
+                        )
+            except Exception as e:
+                logger.error(f"Error in daily morning scheduler: {e}")
+                
+            await asyncio.sleep(20)
+
     def get_status(self) -> Dict[str, Any]:
         """Returns comprehensive status of Deriv auto-trader."""
         news_info = {}
@@ -1063,6 +1116,11 @@ class DerivAutoTrader:
             "app_id": self.app_id,
             "account": self.account_info,
             "config": self.config,
+            "daily_scheduler": {
+                "target_time_ist": "09:00 AM",
+                "is_active": True,
+                "last_refresh_date": getattr(self, "_last_daily_scheduler_date", None),
+            },
             "stats": {
                 "daily_pnl": round(self.daily_pnl, 2),
                 "total_trades": self.total_trades_count,

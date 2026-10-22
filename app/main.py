@@ -37,6 +37,7 @@ app.add_middleware(
 async def startup_event():
     asyncio.create_task(deriv_trader.auto_connect_on_startup())
     asyncio.create_task(deriv_trader.run_autonomous_scanner())
+    asyncio.create_task(deriv_trader.run_daily_scheduler())
 
 @app.api_route("/ping", methods=["GET", "HEAD"])
 @app.api_route("/api/health", methods=["GET", "HEAD"])
@@ -48,6 +49,7 @@ def health_check():
         "bot_connected": deriv_trader.is_connected,
         "bot_authorized": deriv_trader.is_authorized,
         "auto_trading": deriv_trader.is_auto_trading_enabled,
+        "daily_scheduler": "09:00 AM IST",
         "account": deriv_trader.account_info.get("loginid"),
         "balance": deriv_trader.account_info.get("balance"),
         "active_contracts": len(deriv_trader.active_contracts),
