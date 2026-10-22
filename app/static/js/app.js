@@ -1245,10 +1245,10 @@ class BinaryApp {
                     default_stake: parseFloat(stakeInput?.value || 0.5),
                     min_confidence: parseInt(confInput?.value || 80),
                     take_profit_daily: parseFloat(tpInput?.value || 1.0),
-                    stop_loss_daily: parseFloat(slInput?.value || 1.0),
+                    stop_loss_daily: parseFloat(slInput?.value || 1.5),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),
-                    max_daily_losses: parseInt(maxLossesInput?.value || 2),
-                    min_payout_rate: parseFloat(minPayoutInput?.value || 75) / 100.0,
+                    max_daily_losses: parseInt(maxLossesInput?.value || 3),
+                    min_payout_rate: parseFloat(minPayoutInput?.value || 70) / 100.0,
                     allowed_market: marketInput?.value || "all",
                     engine_version: selectedEngine,
                 };

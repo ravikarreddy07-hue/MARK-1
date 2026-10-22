@@ -107,11 +107,11 @@ class DerivAutoTrader:
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 1.0,
-            "stop_loss_daily": 1.0,
+            "stop_loss_daily": 1.5,
             "max_daily_trades": 10,
-            "max_daily_losses": 2,
+            "max_daily_losses": 3,
             "max_daily_wins": 2,
-            "min_payout_rate": 0.75,
+            "min_payout_rate": 0.70,
             "max_concurrent_trades": 1,
             "cooldown_seconds": 900,
             "allowed_market": "all",
@@ -600,8 +600,8 @@ class DerivAutoTrader:
         payout = proposal_res.get("proposal", {}).get("payout", 0.0)
         ask_price = proposal_res.get("proposal", {}).get("ask_price", trade_stake)
         
-        # Check minimum payout rate (75% default for Forex, 60% for Gold/Metals)
-        default_min_rate = float(self.config.get("min_payout_rate", 0.75))
+        # Check minimum payout rate (70% default for Forex, 60% for Gold/Metals)
+        default_min_rate = float(self.config.get("min_payout_rate", 0.70))
         is_metal = "XAU" in deriv_symbol or "XAG" in deriv_symbol or symbol.upper() in ("GOLD", "SILVER")
         required_payout = min(0.60, default_min_rate) if is_metal else default_min_rate
 
