@@ -3,10 +3,11 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 
 # ─── Forex session windows (UTC hours) ────────────────────────────────────────
-LONDON_OPEN  = 8.0    # 08:00 UTC = 13:30 IST
+ASIAN_OPEN   = 3.5    # 03:30 UTC = 09:00 IST (Tokyo / Asian Session Open)
+LONDON_OPEN  = 8.0    # 08:00 UTC = 13:30 IST (London Session Open)
 LONDON_CLOSE = 16.5   # 16:30 UTC = 22:00 IST
-NY_OPEN      = 13.0   # 13:00 UTC = 18:30 IST
-NY_CLOSE     = 21.0   # 21:00 UTC = 02:30 IST+1
+NY_OPEN      = 13.0   # 13:00 UTC = 18:30 IST (New York Session Open)
+NY_CLOSE     = 21.0   # 21:00 UTC = 02:30 IST+1 (US Session Close)
 
 # ─── Asset type detection ─────────────────────────────────────────────────────
 CRYPTO_SUFFIXES  = ("USDT", "USDC", "BTC", "ETH", "BNB")
@@ -41,9 +42,10 @@ def is_active_session(timestamp_seconds: int, asset_type: str = "forex") -> bool
             return False
         if weekday == 6 and hour < 21.0:  # Sunday pre-open
             return False
+        in_asian  = ASIAN_OPEN <= hour <= LONDON_OPEN
         in_london = LONDON_OPEN <= hour <= LONDON_CLOSE
         in_ny     = NY_OPEN <= hour <= NY_CLOSE
-        return in_london or in_ny
+        return in_asian or in_london or in_ny
     except Exception:
         return True  # fail open
 
@@ -199,7 +201,7 @@ def evaluate_candle_signal(
 
     # ── UPGRADE 1: Session filter (controlled by preset) ──────────────────────
     if p_session and not is_active_session(t, asset_type):
-        return _neutral(t, close_p, "Outside trading session (London/NY only for Forex)")
+        return _neutral(t, close_p, "Outside trading session (Asian/London/NY only for Forex)")
 
     # ── High-Impact Economic News Blackout Gate (30m Before & 30m After) ────
     try:

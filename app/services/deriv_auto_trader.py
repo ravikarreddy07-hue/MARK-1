@@ -69,13 +69,14 @@ BLACKLISTED_SYMBOLS = {
     "AUDJPY", "EURJPY", "EURAUD",
     "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",
     "USDJPY", "AUDUSD",  # Audited: 0% win rate on live ledger (-$2.50 drag)
+    "GBPJPY",  # Audited: 25% win rate, excessive 150-pip volatility / late-minute counter wicks
     # Audited low win-rate synthetics (<45% on Deriv live)
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for Autonomous Cloud Scanner: Top 3 Institutional Champions Only (67.6% Proven Win Rate)
+# Whitelist for Autonomous Cloud Scanner: Top 2 Stable Institutional Champions (EUR/USD & USD/CAD)
 AUTONOMOUS_WATCHLIST = [
-    "EURUSD", "GBPJPY", "USDCAD",
+    "EURUSD", "USDCAD",
 ]
 
 
@@ -1228,6 +1229,12 @@ class DerivAutoTrader:
                     self.consecutive_losses_count = 0
                     self.log_activity(f"🏆 CONTRACT WON! #{contract_id} on {trade['symbol']} | Profit: +${profit:.2f}", "success", trade)
                     
+                    # 5-minute post-win cooldown on this specific asset to allow fresh candle cycle
+                    sym = trade.get("symbol")
+                    if sym:
+                        self.trade_cooldowns[sym] = time.time() + 300
+                        self.log_activity(f"⏳ Placed 5-minute post-trade cooldown on {sym} to let market form fresh candle structure.", "info")
+
                     # Immediate shutdown if max daily wins target reached
                     max_wins = int(self.config.get("max_daily_wins", 10000))
                     if max_wins < 10000 and self.won_trades_count >= max_wins:
