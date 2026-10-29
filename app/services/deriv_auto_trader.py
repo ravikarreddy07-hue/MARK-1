@@ -67,16 +67,16 @@ DERIV_SYMBOL_MAP = {
 BLACKLISTED_SYMBOLS = {
     "GOLD", "XAUUSD", "EURGBP",
     "AUDJPY", "EURJPY", "EURAUD",
-    "NZDUSD", "USDCHF", "GBPUSD", "GBPAUD",
+    "NZDUSD", "USDCHF", "GBPAUD",
     "USDJPY", "AUDUSD",  # Audited: 0% win rate on live ledger (-$2.50 drag)
     "GBPJPY",  # Audited: 25% win rate, excessive 150-pip volatility / late-minute counter wicks
     # Audited low win-rate synthetics (<45% on Deriv live)
     "1HZ25V", "R_75", "1HZ50V", "R_25", "1HZ100V", "R_10", "R_50", "1HZ10V",
 }
 
-# Whitelist for Autonomous Cloud Scanner: Top 2 Stable Institutional Champions (EUR/USD & USD/CAD)
+# Whitelist for Autonomous Cloud Scanner: Top 3 Institutional Champions
 AUTONOMOUS_WATCHLIST = [
-    "EURUSD", "USDCAD",
+    "EURUSD", "USDCAD", "GBPUSD",
 ]
 
 
@@ -104,7 +104,7 @@ class DerivAutoTrader:
         # Auto-Trading Configuration & Risk Rules
         self.config: Dict[str, Any] = {
             "default_stake": 0.5,
-            "min_confidence": 80.0,
+            "min_confidence": 82.0,
             "preferred_duration": 15,
             "duration_unit": "m",
             "take_profit_daily": 1.0,
@@ -708,6 +708,12 @@ class DerivAutoTrader:
         sig_type = signal_data.get("signal")
         if sig_type not in ("CALL", "PUT"):
             return None
+
+        # Closed Candle Execution Safeguard:
+        # Never trade on unclosed forming candles or intra-bar spikes.
+        # Only take trades confirmed on fully closed candles.
+        if not signal_data.get("is_confirmed") or signal_data.get("status") != "CONFIRMED":
+            return None
             
         # Whitelist & Blacklist Safeguard: Strictly restrict auto-trading to the 3 Champions
         clean_sym = symbol.upper().replace("/", "").replace("-", "")
@@ -715,7 +721,7 @@ class DerivAutoTrader:
             return None
 
         confidence = float(signal_data.get("confidence", 0))
-        min_conf = float(self.config.get("min_confidence", 80.0))
+        min_conf = float(self.config.get("min_confidence", 82.0))
         if confidence < min_conf:
             return None
             
@@ -1098,7 +1104,11 @@ class DerivAutoTrader:
                                 is_elite_mode=False,
                             )
                             curr_sig = sig_data.get("current", {})
-                            if curr_sig.get("signal") in ("CALL", "PUT"):
+                            if (
+                                curr_sig.get("signal") in ("CALL", "PUT")
+                                and curr_sig.get("is_confirmed")
+                                and curr_sig.get("status") == "CONFIRMED"
+                            ):
                                 await self.evaluate_auto_trade_signal(curr_sig, sym)
                         except Exception as sym_err:
                             logger.debug(f"Error scanning {sym}: {sym_err}")

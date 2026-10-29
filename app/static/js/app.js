@@ -1243,7 +1243,7 @@ class BinaryApp {
                 this.engineVersion = selectedEngine;
                 const updates = {
                     default_stake: parseFloat(stakeInput?.value || 0.5),
-                    min_confidence: parseInt(confInput?.value || 80),
+                    min_confidence: parseInt(confInput?.value || 82),
                     take_profit_daily: parseFloat(tpInput?.value || 1.0),
                     stop_loss_daily: parseFloat(slInput?.value || 1.5),
                     max_daily_wins: parseInt(maxWinsInput?.value || 2),

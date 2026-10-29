@@ -59,6 +59,7 @@ ENGINE_PRESETS = {
         "min_bear_score":     9.0,
         "min_lead":           3.5,
         "adx_min":           15.0,
+        "adx_max":           30.0,
         "pillars_required":     4,
         "two_candle_confirm": False,
         "session_filter":     True,
@@ -72,6 +73,7 @@ ENGINE_PRESETS = {
         "min_bear_score":    6.8,
         "min_lead":          1.5,
         "adx_min":          10.0,
+        "adx_max":          30.0,
         "pillars_required":    4,
         "two_candle_confirm": True,
         "session_filter":    False,
@@ -85,6 +87,7 @@ ENGINE_PRESETS = {
         "min_bear_score":    6.8,
         "min_lead":          1.5,
         "adx_min":          10.0,
+        "adx_max":          30.0,
         "pillars_required":    4,
         "two_candle_confirm": True,
         "session_filter":    False,
@@ -98,6 +101,7 @@ ENGINE_PRESETS = {
         "min_bear_score":    9.0,
         "min_lead":          3.5,
         "adx_min":          15.0,
+        "adx_max":          30.0,
         "pillars_required":    4,
         "two_candle_confirm": False,
         "session_filter":     True,
@@ -136,6 +140,7 @@ MIN_BULL_SCORE = 9.0
 MIN_BEAR_SCORE = 9.0
 MIN_LEAD       = 3.5
 ADX_MIN_TREND  = 15.0
+ADX_MAX_TREND  = 30.0
 
 
 
@@ -166,6 +171,7 @@ def evaluate_candle_signal(
     p_min_lead      = preset.get("min_lead",          MIN_LEAD)
 
     p_adx_min       = preset.get("adx_min",           ADX_MIN_TREND)
+    p_adx_max       = preset.get("adx_max",           ADX_MAX_TREND)
     p_pillars       = preset.get("pillars_required",  4)
     p_session       = preset.get("session_filter",    True)
     p_require_mtf   = preset.get("require_mtf",       False)
@@ -266,9 +272,12 @@ def evaluate_candle_signal(
 
     # ── Pre-flight checks ─────────────────────────────────────────────────────
 
-    # UPGRADE 2: ADX filter — skip if market is choppy/ranging
-    if curr_adx is not None and curr_adx < p_adx_min:
-        return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {p_adx_min} — market ranging, skip")
+    # UPGRADE 2: ADX filter — skip if market is choppy/ranging or in runaway momentum
+    if curr_adx is not None:
+        if curr_adx < p_adx_min:
+            return _neutral(t, close_p, f"ADX {curr_adx:.1f} < {p_adx_min} — market ranging, skip")
+        if curr_adx > p_adx_max:
+            return _neutral(t, close_p, f"ADX {curr_adx:.1f} > {p_adx_max} — runaway trend momentum, skip reversal")
 
 
     # Skip candles with no meaningful volatility (ATR < 0.001% of price = completely flat)
@@ -715,8 +724,8 @@ def generate_all_signals(
         elif forming_sig.get("signal") in ("CALL", "PUT"):
             current_signal = dict(forming_sig)
             current_signal["status"] = "FORMING"
-            current_signal["status_label"] = "⚡ High-Momentum Spike" if forming_sig.get("confidence", 0) >= spike_conf else "🟡 Forming (Wait for Candle Close)"
-            current_signal["is_confirmed"] = forming_sig.get("confidence", 0) >= spike_conf
+            current_signal["status_label"] = "⚡ High-Momentum Spike (Wait for Candle Close)" if forming_sig.get("confidence", 0) >= spike_conf else "🟡 Forming (Wait for Candle Close)"
+            current_signal["is_confirmed"] = False
         else:
             current_signal = dict(forming_sig)
             current_signal["status"] = "NEUTRAL"
