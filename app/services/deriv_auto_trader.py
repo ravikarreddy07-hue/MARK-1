@@ -854,11 +854,97 @@ class DerivAutoTrader:
             try:
                 res = await self.connect(token=token, app_id=app_id)
                 logger.info(f"Startup Deriv Auto-Connect result: {res.get('success')}")
-                if res.get("success") and auto_trade:
-                    self.is_auto_trading_enabled = True
-                    self.log_activity("Restored Auto-Trading state: ACTIVE ⚡ (Cloud 24/7 Mode)", "info")
+                if res.get("success"):
+                    # Synchronize real trade history from broker to enforce daily loss/win limits even across reboots
+                    await self.sync_daily_stats_from_broker()
+                    if auto_trade and self.lost_trades_count < int(self.config.get("max_daily_losses", 3)) and self.daily_pnl > -float(self.config.get("stop_loss_daily", 1.5)):
+                        self.is_auto_trading_enabled = True
+                        self.log_activity("Restored Auto-Trading state: ACTIVE ⚡ (Cloud 24/7 Mode)", "info")
+                    else:
+                        self.is_auto_trading_enabled = False
             except Exception as e:
                 logger.error(f"Startup Deriv Auto-Connect failed: {e}")
+
+    async def sync_daily_stats_from_broker(self) -> Dict[str, Any]:
+        """
+        Synchronizes daily trade count, won/lost counts, and net PnL directly from Deriv broker.
+        Guarantees that cloud server container restarts or crash recovery NEVER reset the
+        risk management counters (e.g. max_daily_losses = 3).
+        """
+        if not self.ws or not self.is_connected:
+            return {"synced": False, "reason": "Not connected"}
+            
+        try:
+            res = await self._send_request({
+                "profit_table": 1,
+                "description": 1,
+                "limit": 50,
+                "sort": "DESC"
+            }, timeout=6.0)
+            
+            txs = res.get("profit_table", {}).get("transactions", [])
+            ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+            today_str = datetime.datetime.now(ist_tz).strftime("%Y-%m-%d")
+            
+            total_today = 0
+            wins_today = 0
+            losses_today = 0
+            pnl_today = 0.0
+            
+            for t in txs:
+                p_time = t.get("purchase_time", 0)
+                dt_ist = datetime.datetime.fromtimestamp(p_time, tz=datetime.timezone.utc).astimezone(ist_tz)
+                if dt_ist.strftime("%Y-%m-%d") == today_str:
+                    total_today += 1
+                    buy_price = float(t.get("buy_price", 0.0))
+                    sell_price = float(t.get("sell_price", 0.0))
+                    profit = sell_price - buy_price
+                    pnl_today += profit
+                    if sell_price > buy_price:
+                        wins_today += 1
+                    else:
+                        losses_today += 1
+                        
+            self.total_trades_count = total_today
+            self.won_trades_count = wins_today
+            self.lost_trades_count = losses_today
+            self.daily_pnl = round(pnl_today, 2)
+            
+            # Risk Gate Verification
+            max_losses = int(self.config.get("max_daily_losses", 3))
+            sl_target = float(self.config.get("stop_loss_daily", 1.5))
+            max_wins = int(self.config.get("max_daily_wins", 2))
+            tp_target = float(self.config.get("take_profit_daily", 1.0))
+            
+            if losses_today >= max_losses or pnl_today <= -sl_target:
+                self.is_auto_trading_enabled = False
+                self.log_activity(
+                    f"🛑 Broker Sync: Daily Loss limit reached ({losses_today}/{max_losses} losses, PnL: ${pnl_today:+.2f}). Auto-trading locked to PAUSED.",
+                    "warning"
+                )
+            elif wins_today >= max_wins or pnl_today >= tp_target:
+                self.is_auto_trading_enabled = False
+                self.log_activity(
+                    f"🏆 Broker Sync: Daily Target reached ({wins_today}/{max_wins} wins, PnL: ${pnl_today:+.2f}). Auto-trading locked to PAUSED to secure profit.",
+                    "success"
+                )
+            else:
+                self.log_activity(
+                    f"📊 Broker Sync Verified: Today's record: {wins_today}W / {losses_today}L | Net PnL: ${pnl_today:+.2f}",
+                    "info"
+                )
+                
+            return {
+                "synced": True,
+                "total": total_today,
+                "wins": wins_today,
+                "losses": losses_today,
+                "pnl": self.daily_pnl,
+                "is_auto_trading_enabled": self.is_auto_trading_enabled
+            }
+        except Exception as e:
+            logger.error(f"Error syncing daily stats from broker: {e}")
+            return {"synced": False, "error": str(e)}
 
     async def fetch_deriv_candles(self, symbol: str, count: int = 100, granularity: int = 60) -> List[Dict[str, Any]]:
         """Fetches real-time candles directly from Deriv WebSocket."""
@@ -953,6 +1039,15 @@ class DerivAutoTrader:
                 if self.is_auto_trading_enabled and self.is_connected and self.is_authorized:
                     # Clean up and settle any finished contracts
                     await self.reconcile_active_contracts()
+
+                    # Periodic sync with broker ledger to guarantee loss/profit limits are never breached
+                    now_time = time.time()
+                    if now_time - getattr(self, "_last_broker_stats_sync", 0) > 180:
+                        self._last_broker_stats_sync = now_time
+                        await self.sync_daily_stats_from_broker()
+                        if not self.is_auto_trading_enabled:
+                            await asyncio.sleep(20)
+                            continue
 
                     allowed_m = str(self.config.get("allowed_market", "all")).lower()
                     active_symbols = AUTONOMOUS_WATCHLIST
