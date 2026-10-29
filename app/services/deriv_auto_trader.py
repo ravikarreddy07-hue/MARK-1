@@ -130,6 +130,7 @@ class DerivAutoTrader:
         self.trade_cooldowns: Dict[str, float] = {}
         self.activity_log: List[Dict[str, Any]] = []
         self._last_daily_scheduler_date: Optional[str] = None
+        self.session_reset_timestamp: float = 0.0
         
         self._ws_task = None
         self._running = False
@@ -416,19 +417,37 @@ class DerivAutoTrader:
         self.log_activity("Disconnected from Deriv API. Auto-trading paused.", "info")
         return {"success": True, "message": "Disconnected successfully"}
 
-    async def restart_bot_session(self) -> Dict[str, Any]:
+    async def restart_bot_session(self, enable_auto_trade: bool = True) -> Dict[str, Any]:
         """
         Explicitly restarts the bot session and resets session counters and trade history to 0.
+        Sets session_reset_timestamp to now so broker sync only tracks trades in this new session.
         """
         from app.services.trade_manager import trade_manager
         trade_manager.clear_history()
+        self.session_reset_timestamp = time.time()
         self.daily_pnl = 0.0
         self.total_trades_count = 0
         self.won_trades_count = 0
         self.lost_trades_count = 0
         self.consecutive_losses_count = 0
         self.active_contracts.clear()
-        self.log_activity("🔄 Bot session restarted: Cleaned to 0 trades for fresh run.", "warning")
+        if enable_auto_trade:
+            self.is_auto_trading_enabled = True
+        self.log_activity("🔄 Bot session restarted: Cleaned to 0 trades for fresh run. Auto-trading ACTIVE ⚡", "success")
+
+        # Persist session_reset_timestamp and is_auto_trading_enabled to CREDENTIALS_FILE
+        try:
+            os.makedirs(os.path.dirname(CREDENTIALS_FILE), exist_ok=True)
+            existing = {}
+            if os.path.exists(CREDENTIALS_FILE):
+                with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+            existing["is_auto_trading_enabled"] = self.is_auto_trading_enabled
+            existing["session_reset_timestamp"] = self.session_reset_timestamp
+            with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
+                json.dump(existing, f)
+        except Exception:
+            pass
 
         # Cleanly reconnect WebSocket session
         clean_token = self.api_token or DEFAULT_DERIV_TOKEN
@@ -437,9 +456,10 @@ class DerivAutoTrader:
 
         return {
             "success": True,
-            "message": "Bot session restarted successfully. Trade history cleaned to 0.",
+            "message": "Bot session restarted successfully. Trade history cleaned to 0. Auto-trading is now ACTIVE.",
             "is_connected": self.is_connected,
             "is_authorized": self.is_authorized,
+            "is_auto_trading_enabled": self.is_auto_trading_enabled,
             "account": self.account_info,
             "daily_stats": {
                 "daily_pnl": self.daily_pnl,
@@ -476,6 +496,7 @@ class DerivAutoTrader:
                 try:
                     from app.services.trade_manager import trade_manager
                     trade_manager.clear_history()
+                    self.session_reset_timestamp = time.time()
                     self.daily_pnl = 0.0
                     self.total_trades_count = 0
                     self.won_trades_count = 0
@@ -494,6 +515,7 @@ class DerivAutoTrader:
                 with open(CREDENTIALS_FILE, "r", encoding="utf-8") as f:
                     existing = json.load(f)
             existing["is_auto_trading_enabled"] = self.is_auto_trading_enabled
+            existing["session_reset_timestamp"] = getattr(self, "session_reset_timestamp", 0.0)
             existing["config"] = self.config
             with open(CREDENTIALS_FILE, "w", encoding="utf-8") as f:
                 json.dump(existing, f)
@@ -847,6 +869,7 @@ class DerivAutoTrader:
                     token = data.get("token")
                     app_id = data.get("app_id", DEFAULT_DERIV_APP_ID)
                     auto_trade = bool(data.get("is_auto_trading_enabled", True))
+                    self.session_reset_timestamp = float(data.get("session_reset_timestamp", 0.0))
                     if "config" in data and isinstance(data["config"], dict):
                         self.config.update(data["config"])
         except Exception:
@@ -890,7 +913,13 @@ class DerivAutoTrader:
             
             txs = res.get("profit_table", {}).get("transactions", [])
             ist_tz = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
-            today_str = datetime.datetime.now(ist_tz).strftime("%Y-%m-%d")
+            now_ist = datetime.datetime.now(ist_tz)
+            today_str = now_ist.strftime("%Y-%m-%d")
+            today_start_dt = datetime.datetime(now_ist.year, now_ist.month, now_ist.day, tzinfo=ist_tz)
+            today_start_ts = today_start_dt.timestamp()
+
+            saved_cutoff = float(getattr(self, "session_reset_timestamp", 0.0))
+            session_cutoff = max(saved_cutoff, today_start_ts)
             
             total_today = 0
             wins_today = 0
@@ -900,7 +929,7 @@ class DerivAutoTrader:
             for t in txs:
                 p_time = t.get("purchase_time", 0)
                 dt_ist = datetime.datetime.fromtimestamp(p_time, tz=datetime.timezone.utc).astimezone(ist_tz)
-                if dt_ist.strftime("%Y-%m-%d") == today_str:
+                if dt_ist.strftime("%Y-%m-%d") == today_str and p_time >= session_cutoff:
                     total_today += 1
                     buy_price = float(t.get("buy_price", 0.0))
                     sell_price = float(t.get("sell_price", 0.0))
